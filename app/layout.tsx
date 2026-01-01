@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { CaseDevFooter } from "@/components/case-dev-footer";
 import "./globals.css";
 
 const inter = Inter({ 
-  subsets: ['latin'], 
-  variable: '--font-sans' 
+  subsets: ["latin"], 
+  variable: "--font-sans" 
 });
 
 const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -32,8 +33,9 @@ export default function RootLayout({
           rel="stylesheet" 
         />
       </head>
-      <body className="antialiased">
-        {children}
+      <body className="antialiased min-h-screen flex flex-col bg-white dark:bg-neutral-950">
+        <main className="flex-1 flex flex-col">{children}</main>
+        <CaseDevFooter />
       </body>
     </html>
   );
