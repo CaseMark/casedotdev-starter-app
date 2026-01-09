@@ -76,7 +76,7 @@ Before implementing any authentication, gather this information from the user. E
 
 ## Part 1.5: Template Selection
 
-After discovery, select the appropriate schema template based on the user's answers. Templates are located in `skills/auth/templates/`.
+After discovery, select the appropriate schema template based on the user's answers. Templates are located in `lib/auth/templates/`.
 
 ### Decision Tree
 
@@ -115,7 +115,7 @@ Ask in order, stop at first "yes":
 
 1. Copy the template to your project:
    ```bash
-   cp skills/auth/templates/<template>.ts lib/db/schema/auth.ts
+   cp lib/auth/templates/<template>.ts lib/db/schema/auth.ts
    ```
 
 2. Customize for your app:
