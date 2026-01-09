@@ -74,6 +74,67 @@ Before implementing any authentication, gather this information from the user. E
 
 ---
 
+## Part 1.5: Template Selection
+
+After discovery, select the appropriate schema template based on the user's answers. Templates are located in `skills/auth/templates/`.
+
+### Decision Tree
+
+Ask in order, stop at first "yes":
+
+1. **Do users from different companies need to collaborate in shared spaces?**
+   → Use `cross-org-collab.ts`
+
+2. **Is API access the primary interface (not browser sessions)?**
+   → Use `api-platform.ts`
+
+3. **Are there fundamentally different user types (e.g., experts + attorneys)?**
+   → Use `marketplace.ts`
+
+4. **Will multiple separate companies/firms use this as tenants?**
+   → Use `multi-org-saas.ts`
+
+5. **Is this an internal tool for one company with different access levels?**
+   → Use `single-org.ts`
+
+6. **None of the above?**
+   → Use `b2c.ts`
+
+### Template Summary
+
+| Template | Use Case | Examples |
+|----------|----------|----------|
+| `b2c.ts` | Consumer apps, no orgs | Will generators, LLC formation, solo tools |
+| `single-org.ts` | Internal tools, one company | Practice management, doc management, KM |
+| `multi-org-saas.ts` | B2B SaaS with tenant isolation | Clio-style products, CLM, e-discovery |
+| `marketplace.ts` | Two-sided platforms | Expert witness marketplaces, court reporter booking |
+| `cross-org-collab.ts` | Shared spaces across orgs | Deal rooms, client portals, multi-party discovery |
+| `api-platform.ts` | API-first products | Legal AI APIs, court data APIs, e-filing |
+
+### Using a Template
+
+1. Copy the template to your project:
+   ```bash
+   cp skills/auth/templates/<template>.ts lib/db/schema/auth.ts
+   ```
+
+2. Customize for your app:
+   - **Roles:** Edit `roleEnum` or `memberRoleEnum` to match your hierarchy
+   - **User types:** For marketplace, rename provider/client to your terms
+   - **Scopes:** For API platform, define your API permission scopes
+
+3. Generate and run migrations:
+   ```bash
+   bun drizzle-kit generate
+   bun drizzle-kit migrate
+   ```
+
+4. Continue to Part 4 (Complete Setup Guide) for better-auth configuration.
+
+See `templates/README.md` for detailed documentation on each template.
+
+---
+
 ## Part 2: Communication Guide
 
 ### Explaining Auth Concepts
