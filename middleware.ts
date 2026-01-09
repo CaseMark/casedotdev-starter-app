@@ -1,8 +1,23 @@
 /**
- * Next.js Middleware for Route Protection
+ * Next.js Middleware for Route Protection with Better Auth
  *
- * This middleware provides composable authentication patterns using Better Auth.
- * Configure protection based on your app's needs - it's opt-in, not opt-out.
+ * This middleware provides COMPOSABLE authentication patterns.
+ * It is TEMPLATE-AGNOSTIC by design - ready to support any of the 6 auth templates:
+ *
+ * 1. Client Portal - External users accessing their matters
+ * 2. Internal Tool - Firm staff only (OAuth or email/password)
+ * 3. Multi-Firm SaaS - Multiple orgs with isolated data
+ * 4. Hybrid - Both internal staff and external clients
+ * 5. OAuth Only - Log in with Google/Microsoft
+ * 6. With 2FA - Extra security for compliance
+ *
+ * The starter app ships with AUTH_MODE = "public-by-default" so apps
+ * work immediately without requiring user authentication setup.
+ *
+ * When you're ready to add auth:
+ * 1. Set up your database (see skills/auth/SKILL.md)
+ * 2. Add routes to protectedRoutes array below
+ * 3. That's it - the login/signup pages already exist
  *
  * @see skills/auth/SKILL.md for detailed documentation
  */
@@ -11,125 +26,121 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * PROTECTION STRATEGY
+ * CONFIGURATION
  * 
- * Choose ONE of these patterns by uncommenting the appropriate section:
- * 
- * 1. NO PROTECTION (default) - All routes accessible, add auth later
- * 2. PROTECT SPECIFIC ROUTES - Only listed routes require auth
- * 3. PROTECT ALL EXCEPT PUBLIC - Traditional "protect everything" approach
+ * Adjust these settings based on your app's needs.
  */
 
-// ============================================================================
-// PATTERN 1: NO PROTECTION (Default)
-// ============================================================================
-// All routes are accessible. Use this when:
-// - Building an MVP or prototype
-// - App doesn't need user accounts yet
-// - You want to add auth incrementally
-//
-// To add protection later, switch to Pattern 2 or 3
+/**
+ * Auth mode determines the overall protection strategy:
+ * - "disabled": No route protection (for MVPs, prototypes)
+ * - "public-by-default": Only protect routes in `protectedRoutes`
+ * - "private-by-default": Protect everything except `publicRoutes`
+ */
+const AUTH_MODE: "disabled" | "public-by-default" | "private-by-default" = "public-by-default";
 
-export function middleware(_request: NextRequest) {
-  return NextResponse.next();
-}
-
-// ============================================================================
-// PATTERN 2: PROTECT SPECIFIC ROUTES (Recommended)
-// ============================================================================
-// Only listed routes require authentication. Use this when:
-// - Most of your app is public
-// - Only certain pages need login (dashboard, settings, etc.)
-// - You want explicit control over what's protected
-//
-// Uncomment this section and comment out Pattern 1 to enable:
-
-/*
+/**
+ * Routes that require authentication (used in "public-by-default" mode)
+ * Add routes that should only be accessible to logged-in users
+ */
 const protectedRoutes = [
   "/dashboard",
   "/settings",
   "/account",
-  // Add routes that require authentication
+  "/admin",
 ];
+
+/**
+ * Routes that don't require authentication (used in "private-by-default" mode)
+ * Add marketing pages, public content, etc.
+ */
+const publicRoutes = [
+  "/",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/api/auth",      // Better Auth API routes (required)
+  "/verify-email",
+  "/accept-invite",
+];
+
+/**
+ * Routes that should never require auth regardless of mode
+ * (e.g., health checks, webhooks with their own auth)
+ */
+const alwaysPublicRoutes = [
+  "/api/auth",      // Better Auth API (required)
+  "/api/health",
+  "/api/webhooks",
+];
+
+// ============================================================================
+// Implementation
+// ============================================================================
+
+function matchesRoute(pathname: string, routes: string[]): boolean {
+  return routes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
 
 function isProtectedRoute(pathname: string): boolean {
-  return protectedRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  return matchesRoute(pathname, protectedRoutes);
 }
-
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // Only check auth for protected routes
-  if (!isProtectedRoute(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Check for session cookie (Better Auth default)
-  const sessionCookie = request.cookies.get("better-auth.session_token");
-
-  if (!sessionCookie) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-}
-*/
-
-// ============================================================================
-// PATTERN 3: PROTECT ALL EXCEPT PUBLIC
-// ============================================================================
-// Everything requires auth except whitelisted routes. Use this when:
-// - Building a fully authenticated app (internal tools, client portals)
-// - Most pages should require login
-// - You have a clear list of public pages
-//
-// Uncomment this section and comment out Pattern 1 to enable:
-
-/*
-const publicRoutes = [
-  "/",              // Landing page
-  "/login",         // Login page
-  "/signup",        // Signup page
-  "/api/auth",      // Better Auth API (required)
-  // Add other public routes (marketing pages, docs, etc.)
-];
 
 function isPublicRoute(pathname: string): boolean {
-  return publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  return matchesRoute(pathname, publicRoutes);
+}
+
+function isAlwaysPublicRoute(pathname: string): boolean {
+  return matchesRoute(pathname, alwaysPublicRoutes);
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  if (isPublicRoute(pathname)) {
+  // Always allow certain routes regardless of auth mode
+  if (isAlwaysPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
-  // Check for session cookie (Better Auth default)
+  // Handle based on auth mode
+  switch (AUTH_MODE) {
+    case "disabled":
+      // No protection - all routes accessible
+      return NextResponse.next();
+
+    case "public-by-default":
+      // Only protect specific routes
+      if (!isProtectedRoute(pathname)) {
+        return NextResponse.next();
+      }
+      break;
+
+    case "private-by-default":
+      // Protect everything except public routes
+      if (isPublicRoute(pathname)) {
+        return NextResponse.next();
+      }
+      break;
+  }
+
+  // Check for Better Auth session cookie
   const sessionCookie = request.cookies.get("better-auth.session_token");
 
   if (!sessionCookie) {
+    // No session - redirect to login
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
+  // Session exists - allow access
+  // Note: This only checks cookie presence, not validity
+  // Full session validation happens in your API routes/server components
   return NextResponse.next();
 }
-*/
-
-// ============================================================================
-// ADVANCED: ROLE-BASED PROTECTION
-// ============================================================================
-// For apps that need different access levels. See skills/auth/SKILL.md for
-// full implementation with Better Auth organization plugin.
 
 /**
  * Configure which routes the middleware runs on
@@ -142,6 +153,6 @@ export function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
