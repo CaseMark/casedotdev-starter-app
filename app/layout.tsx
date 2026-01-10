@@ -14,8 +14,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Create Legal App",
-  description: "The foundation is set. Now connect the dots.",
+  title: "Multi-Language Document Processor",
+  description: "OCR, translate, and search documents in any Latin-script language. Built with Case.dev.",
 };
 
 export default function RootLayout({
