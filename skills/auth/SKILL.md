@@ -161,7 +161,7 @@ Before implementing any authentication, gather this information from the user. E
 
 ## Part 1.5: Template Selection
 
-After discovery, select the appropriate schema template based on the user's answers. Templates are located in `lib/auth/templates/`.
+After discovery, select the appropriate schema template based on the user's answers. Templates are located in `docs/auth-schema-templates/`.
 
 ### Decision Tree
 
@@ -200,7 +200,7 @@ Ask in order, stop at first "yes":
 
 1. Copy the template to your project:
    ```bash
-   cp lib/auth/templates/<template>.ts lib/db/schema/auth.ts
+   cp docs/auth-schema-templates/<template>.ts lib/db/schema/auth.ts
    ```
 
 2. Customize for your app:
@@ -216,7 +216,7 @@ Ask in order, stop at first "yes":
 
 4. Continue to Part 4 (Complete Setup Guide) for better-auth configuration.
 
-See `templates/README.md` for detailed documentation on each template.
+See `docs/auth-schema-templates/README.md` for detailed documentation on each template.
 
 ---
 

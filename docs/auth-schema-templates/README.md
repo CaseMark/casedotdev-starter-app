@@ -2,12 +2,12 @@
 
 MIT-licensed, copy-paste ready Drizzle + better-auth schema templates for legal applications.
 
-**Template files are located at:** `lib/auth/templates/`
+**Template files are located at:** `docs/auth-schema-templates/`
 
 ## Quick Start
 
 1. **Answer the decision tree questions** below to find your template
-2. **Copy the template** to your schema directory: `cp lib/auth/templates/<template>.ts lib/db/schema/auth.ts`
+2. **Copy the template** to your schema directory: `cp docs/auth-schema-templates/<template>.ts lib/db/schema/auth.ts`
 3. **Customize** roles, user types, or scopes as needed
 4. **Run migrations**: `bun drizzle-kit generate && bun drizzle-kit migrate`
 5. **Configure better-auth** following the main SKILL.md
@@ -49,12 +49,12 @@ Ask these questions in order. Stop at the first "yes":
 
 | Template | Use Case | Key Tables |
 |----------|----------|------------|
-| [`b2c.ts`](../../../lib/auth/templates/b2c.ts) | Consumer apps, no orgs | user, session, account, verification |
-| [`single-org.ts`](../../../lib/auth/templates/single-org.ts) | Internal tools, one company | + role enum on user |
-| [`multi-org-saas.ts`](../../../lib/auth/templates/multi-org-saas.ts) | B2B SaaS with tenants | + organization, member, invitation |
-| [`marketplace.ts`](../../../lib/auth/templates/marketplace.ts) | Two-sided platforms | + userType, providerProfile, clientProfile |
-| [`cross-org-collab.ts`](../../../lib/auth/templates/cross-org-collab.ts) | Shared workspaces | + workspace, workspaceMember |
-| [`api-platform.ts`](../../../lib/auth/templates/api-platform.ts) | API-first products | + apiKey, apiKeyUsage, webhookEndpoint |
+| [`b2c.ts`](./b2c.ts) | Consumer apps, no orgs | user, session, account, verification |
+| [`single-org.ts`](./single-org.ts) | Internal tools, one company | + role enum on user |
+| [`multi-org-saas.ts`](./multi-org-saas.ts) | B2B SaaS with tenants | + organization, member, invitation |
+| [`marketplace.ts`](./marketplace.ts) | Two-sided platforms | + userType, providerProfile, clientProfile |
+| [`cross-org-collab.ts`](./cross-org-collab.ts) | Shared workspaces | + workspace, workspaceMember |
+| [`api-platform.ts`](./api-platform.ts) | API-first products | + apiKey, apiKeyUsage, webhookEndpoint |
 
 ---
 
