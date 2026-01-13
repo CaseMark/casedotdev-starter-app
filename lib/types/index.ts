@@ -1,5 +1,5 @@
-// Supported languages for OCR and translation
-// Currently limited to Latin alphabet languages only
+// Supported languages for translation
+// Supports all 100+ languages available via Google Translate
 export const SUPPORTED_LANGUAGES = {
   // Western European
   es: { name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
@@ -28,6 +28,25 @@ export const SUPPORTED_LANGUAGES = {
   ms: { name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾' },
   vi: { name: 'Vietnamese', nativeName: 'Tiếng Việt', flag: '🇻🇳' },
   tl: { name: 'Tagalog', nativeName: 'Tagalog', flag: '🇵🇭' },
+  // East Asian
+  zh: { name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
+  ja: { name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
+  ko: { name: 'Korean', nativeName: '한국어', flag: '🇰🇷' },
+  // South Asian
+  hi: { name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
+  bn: { name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩' },
+  ta: { name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' },
+  // Middle Eastern
+  ar: { name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
+  he: { name: 'Hebrew', nativeName: 'עברית', flag: '🇮🇱' },
+  fa: { name: 'Persian', nativeName: 'فارسی', flag: '🇮🇷' },
+  // Cyrillic
+  ru: { name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+  uk: { name: 'Ukrainian', nativeName: 'Українська', flag: '🇺🇦' },
+  // Greek
+  el: { name: 'Greek', nativeName: 'Ελληνικά', flag: '🇬🇷' },
+  // Thai
+  th: { name: 'Thai', nativeName: 'ไทย', flag: '🇹🇭' },
   // English (target language)
   en: { name: 'English', nativeName: 'English', flag: '🇺🇸' },
 } as const;

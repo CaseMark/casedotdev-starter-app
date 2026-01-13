@@ -6,6 +6,7 @@ import { SUPPORTED_LANGUAGES, LanguageCode, ProcessingStatus } from '@/lib/types
 import { DEMO_LIMITS } from '@/lib/demo-limits/config';
 import { UsageMeter } from '@/components/demo/UsageMeter';
 import { LimitWarning } from '@/components/demo/LimitWarning';
+import { processDocument } from '@/lib/document-processor';
 
 interface DocumentUploadProps {
   onDocumentProcessed: (document: {
@@ -24,10 +25,10 @@ interface DocumentUploadProps {
 
 const STATUS_MESSAGES: Record<ProcessingStatus, string> = {
   idle: 'Ready to upload',
-  uploading: 'Uploading document...',
+  uploading: 'Extracting text...',
+  ocr_processing: 'Extracting text...',
+  cleaning_text: 'Processing document...',
   detecting_language: 'Detecting language...',
-  ocr_processing: 'Extracting text with OCR...',
-  cleaning_text: 'Cleaning up text formatting...',
   translating: 'Translating to English...',
   indexing: 'Finalizing...',
   completed: 'Processing complete!',
@@ -68,10 +69,16 @@ export default function DocumentUpload({
       return;
     }
 
-    // Validate file type
-    const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff', 'text/plain'];
+    // Check token limit
+    if (tokensUsed >= DEMO_LIMITS.tokens.perSession) {
+      setLimitReached('token');
+      return;
+    }
+
+    // Validate file type - only PDF and TXT (no images)
+    const validTypes = ['application/pdf', 'text/plain'];
     if (!validTypes.includes(file.type)) {
-      setError('Please upload a PDF, image file (JPEG, PNG, TIFF), or text file');
+      setError('Please upload a PDF or text file. Image files are not supported in this demo.');
       return;
     }
 
@@ -88,103 +95,129 @@ export default function DocumentUpload({
     setDetectedLanguageName(null);
 
     try {
-      // Step 1: Upload
+      // ========================================
+      // STEP 1: Extract text from document (client-side)
+      // ========================================
       setStatus('uploading');
       setProgress(10);
 
-      const formData = new FormData();
-      formData.append('file', file);
+      console.log(`[Upload] Processing ${file.name} (${file.type})`);
+      const extraction = await processDocument(file);
 
-      // Step 2: Quick language detection
-      setStatus('detecting_language');
-      setProgress(15);
-
-      const langResponse = await fetch('/api/detect-language', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (langResponse.ok) {
-        const langResult = await langResponse.json();
-        const detectedLang = (langResult.language || 'en') as LanguageCode;
-        const langName = langResult.languageName || SUPPORTED_LANGUAGES[detectedLang]?.name || 'Unknown';
-        setDetectedLanguage(detectedLang);
-        setDetectedLanguageName(langName);
+      if (!extraction.text || extraction.text.trim().length === 0) {
+        throw new Error('Could not extract text from this document. Please ensure the PDF contains selectable text (not a scanned image).');
       }
+
+      const extractedText = extraction.text;
+      const pageCount = extraction.pageCount;
+
+      console.log(`[Upload] Extracted ${extractedText.length} chars from ${pageCount} pages`);
+      setProgress(20);
+
+      // ========================================
+      // STEP 2: Detect language
+      // ========================================
+      setStatus('detecting_language');
       setProgress(25);
 
-      // Step 3: Full processing
-      const processFormData = new FormData();
-      processFormData.append('file', file);
-
-      setStatus('ocr_processing');
-      setProgress(30);
-
-      // Progress simulation
-      let currentProgress = 30;
-      let currentPhase = 0;
-      const phases = [
-        { status: 'ocr_processing' as ProcessingStatus, targetProgress: 50, duration: 15000 },
-        { status: 'cleaning_text' as ProcessingStatus, targetProgress: 65, duration: 10000 },
-        { status: 'translating' as ProcessingStatus, targetProgress: 85, duration: 15000 },
-      ];
-
-      const progressInterval = setInterval(() => {
-        if (currentPhase < phases.length) {
-          const phase = phases[currentPhase];
-          if (currentProgress < phase.targetProgress) {
-            currentProgress += 1;
-            setProgress(currentProgress);
-          } else {
-            currentPhase++;
-            if (currentPhase < phases.length) {
-              setStatus(phases[currentPhase].status);
-            }
-          }
-        }
-      }, 500);
-
-      const response = await fetch('/api/process', {
+      const detectResponse = await fetch('/api/detect-language', {
         method: 'POST',
-        body: processFormData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: extractedText }),
       });
 
-      clearInterval(progressInterval);
+      let langCode: LanguageCode = 'en';
+      let langName = 'English';
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.limitReached) {
-          setLimitReached('token');
-          setIsProcessing(false);
-          return;
-        }
-        throw new Error(errorData.error || 'Processing failed');
+      if (detectResponse.ok) {
+        const detectResult = await detectResponse.json();
+        langCode = (detectResult.language || 'en') as LanguageCode;
+        langName = detectResult.languageName || SUPPORTED_LANGUAGES[langCode]?.name || 'Unknown';
+        console.log(`[Upload] Language detected: ${langName} (${langCode})`);
       }
 
-      const result = await response.json();
+      // Display detected language to user
+      setDetectedLanguage(langCode);
+      setDetectedLanguageName(langName);
+      setProgress(35);
 
-      const finalLang = (result.detectedLanguage || 'en') as LanguageCode;
-      const finalLangName = result.detectedLanguageName || SUPPORTED_LANGUAGES[finalLang]?.name || 'Unknown';
-      setDetectedLanguage(finalLang);
-      setDetectedLanguageName(finalLangName);
-      setProgress(90);
+      // ========================================
+      // STEP 3: Format the original text
+      // ========================================
+      setStatus('cleaning_text');
+      setProgress(40);
 
-      // Finalize
-      setStatus('indexing');
+      let formattedOriginal = extractedText;
+      try {
+        console.log('[Upload] Formatting original text...');
+        const formatResponse = await fetch('/api/format-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: extractedText }),
+        });
+
+        if (formatResponse.ok) {
+          const formatResult = await formatResponse.json();
+          if (formatResult.formattedText && !formatResult.skipped) {
+            formattedOriginal = formatResult.formattedText;
+            console.log(`[Upload] Original text formatted: ${formattedOriginal.length} chars`);
+          }
+        }
+      } catch (formatErr) {
+        console.warn('[Upload] Failed to format original text:', formatErr);
+      }
+
+      setProgress(60);
+
+      // ========================================
+      // STEP 4: Translate formatted text to English (if needed)
+      // ========================================
+      let translatedText = formattedOriginal;
+
+      if (langCode !== 'en') {
+        setStatus('translating');
+        setProgress(70);
+
+        console.log(`[Upload] Translating from ${langName} to English...`);
+        const translateResponse = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: formattedOriginal,
+            sourceLanguage: langCode,
+          }),
+        });
+
+        if (!translateResponse.ok) {
+          const errorData = await translateResponse.json();
+          throw new Error(errorData.error || 'Translation failed');
+        }
+
+        const translateResult = await translateResponse.json();
+        translatedText = translateResult.translatedText;
+        console.log(`[Upload] Translation complete: ${translatedText.length} chars`);
+      } else {
+        console.log('[Upload] Document is in English, no translation needed');
+      }
+
       setProgress(95);
-      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Complete
+      // ========================================
+      // STEP 5: Finalize
+      // ========================================
+      setStatus('indexing');
+
+      // Complete!
       setStatus('completed');
       setProgress(100);
 
       onDocumentProcessed({
         id: generateId(),
         filename: file.name,
-        originalLanguage: finalLang,
-        originalText: result.originalText,
-        translatedText: result.translatedText,
-        pageCount: result.pageCount || 1,
+        originalLanguage: langCode,
+        originalText: formattedOriginal,
+        translatedText: translatedText,
+        pageCount: pageCount,
       });
 
       // Reset after a moment
@@ -195,6 +228,7 @@ export default function DocumentUpload({
       }, 2000);
 
     } catch (err) {
+      console.error('[Upload] Error:', err);
       setStatus('error');
       setError(err instanceof Error ? err.message : 'Processing failed');
       setIsProcessing(false);
@@ -268,7 +302,7 @@ export default function DocumentUpload({
           id="file-input"
           type="file"
           className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,.tiff,.txt"
+          accept=".pdf,.txt"
           onChange={handleFileInput}
           disabled={isProcessing}
         />
@@ -304,18 +338,30 @@ export default function DocumentUpload({
 
             {!isProcessing && status === 'idle' && (
               <p className="text-sm text-gray-500 mt-1">
-                Drag and drop a document, or click to browse
+                Drag and drop a PDF or text file, or click to browse
               </p>
             )}
 
-            {/* Language Detection Badge */}
-            {detectedLanguage && status !== 'idle' && (
+            {/* Language Detection Badge - Show throughout processing once detected */}
+            {detectedLanguage && isProcessing && status !== 'uploading' && status !== 'ocr_processing' && (
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">
                 <Globe className="w-4 h-4" weight="bold" />
                 {SUPPORTED_LANGUAGES[detectedLanguage]?.flag && (
                   <span>{SUPPORTED_LANGUAGES[detectedLanguage].flag}</span>
                 )}
-                <span>{detectedLanguageName || SUPPORTED_LANGUAGES[detectedLanguage]?.name || 'Unknown'} detected</span>
+                <span>Detected: {detectedLanguageName || SUPPORTED_LANGUAGES[detectedLanguage]?.name || 'Unknown'}</span>
+              </div>
+            )}
+
+            {/* Show language on completion too */}
+            {detectedLanguage && status === 'completed' && (
+              <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                <Globe className="w-4 h-4" weight="bold" />
+                {SUPPORTED_LANGUAGES[detectedLanguage]?.flag && (
+                  <span>{SUPPORTED_LANGUAGES[detectedLanguage].flag}</span>
+                )}
+                <span>{detectedLanguageName || SUPPORTED_LANGUAGES[detectedLanguage]?.name || 'Unknown'}</span>
+                {detectedLanguage !== 'en' && <span>→ English</span>}
               </div>
             )}
 
@@ -342,10 +388,10 @@ export default function DocumentUpload({
       {/* Supported Languages */}
       <div className="mt-6">
         <p className="text-sm text-gray-500 text-center mb-3">
-          Supports Latin alphabet languages including:
+          Supports 100+ languages including:
         </p>
         <div className="flex flex-wrap justify-center gap-2">
-          {['es', 'fr', 'de', 'it', 'pt', 'nl', 'pl', 'sv'].map((code) => {
+          {['es', 'zh', 'ar', 'ru', 'ja', 'hi', 'fr', 'de', 'ko', 'pt'].map((code) => {
             const lang = SUPPORTED_LANGUAGES[code as LanguageCode];
             return (
               <span
@@ -358,7 +404,7 @@ export default function DocumentUpload({
             );
           })}
           <span className="inline-flex items-center px-2 py-1 bg-gray-100 rounded text-xs text-gray-600">
-            +16 more
+            +90 more
           </span>
         </div>
       </div>
@@ -367,12 +413,6 @@ export default function DocumentUpload({
       <div className="mt-4 flex justify-center gap-4 text-xs text-gray-400">
         <span className="flex items-center gap-1">
           <FileText className="w-3 h-3" /> PDF
-        </span>
-        <span className="flex items-center gap-1">
-          <FileText className="w-3 h-3" /> JPEG
-        </span>
-        <span className="flex items-center gap-1">
-          <FileText className="w-3 h-3" /> PNG
         </span>
         <span className="flex items-center gap-1">
           <FileText className="w-3 h-3" /> TXT

@@ -17,10 +17,6 @@ const LANGUAGE_CODES: Record<string, string> = {
   en: 'English',
 };
 
-const SUPPORTED_LANG_CODES = Object.entries(LANGUAGE_CODES)
-  .map(([code, name]) => `${code} (${name})`)
-  .join(', ');
-
 export async function POST(request: NextRequest) {
   const apiKey = getApiKey();
 
@@ -32,55 +28,27 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const body = await request.json();
+    const { text } = body;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    if (!text || typeof text !== 'string') {
+      return NextResponse.json({ error: 'No text provided' }, { status: 400 });
     }
 
-    // For text files, default to English
-    if (file.type === 'text/plain') {
-      return NextResponse.json({
-        language: 'en',
-        languageName: 'English',
-        confidence: 0.5,
-      });
-    }
-
-    // Read file into buffer
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const base64Data = buffer.toString('base64');
-
-    // Detect language using LLM
-    const response = await fetch(`${API_BASE_URL}/llm/v1/chat/completions`, {
+    // Use Case.dev Translation API for language detection
+    const response = await fetch(`${API_BASE_URL}/translate/v1/detect`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-20250514',
-        messages: [
-          {
-            role: 'user',
-            content: `Look at this document and identify the PRIMARY language used in it.
-
-Respond with ONLY a JSON object in this exact format (no other text):
-{"language_code": "XX", "language_name": "Language Name", "confidence": 0.95}
-
-Where language_code is one of: ${SUPPORTED_LANG_CODES}
-
-Document content (base64 ${file.type}): ${base64Data.slice(0, 10000)}...`
-          }
-        ],
-        temperature: 0,
-        max_tokens: 100,
+        q: text.slice(0, 5000), // Use first 5000 chars for detection
       }),
     });
 
     if (!response.ok) {
+      console.error(`Language detection API error: ${response.status}`);
       return NextResponse.json({
         language: 'en',
         languageName: 'English',
@@ -89,25 +57,18 @@ Document content (base64 ${file.type}): ${base64Data.slice(0, 10000)}...`
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+    const detection = data.data?.detections?.[0]?.[0];
 
-    // Parse the JSON response
-    try {
-      const jsonMatch = content.match(/\{[^}]+\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const langCode = parsed.language_code?.toLowerCase() || 'en';
-        const langName = parsed.language_name || LANGUAGE_CODES[langCode] || 'Unknown';
-        const confidence = parsed.confidence || 0.8;
+    if (detection) {
+      const langCode = detection.language || 'en';
+      const langName = LANGUAGE_CODES[langCode] || langCode.toUpperCase();
+      const confidence = detection.confidence || 0.8;
 
-        return NextResponse.json({
-          language: langCode,
-          languageName: langName,
-          confidence,
-        });
-      }
-    } catch {
-      // Parse error - return default
+      return NextResponse.json({
+        language: langCode,
+        languageName: langName,
+        confidence,
+      });
     }
 
     return NextResponse.json({
@@ -116,7 +77,8 @@ Document content (base64 ${file.type}): ${base64Data.slice(0, 10000)}...`
       confidence: 0.5,
     });
 
-  } catch {
+  } catch (error) {
+    console.error('Language detection error:', error);
     return NextResponse.json(
       { error: 'Language detection failed' },
       { status: 500 }
