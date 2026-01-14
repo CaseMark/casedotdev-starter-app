@@ -143,7 +143,7 @@ export default function Home() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-gray-900">Multi-Language Processor</h1>
-                <p className="text-xs text-gray-500">OCR • Translate • Search</p>
+                <p className="text-xs text-gray-500">Upload • Translate • Search</p>
               </div>
             </div>
 
@@ -200,25 +200,23 @@ export default function Home() {
               <div className="text-sm text-gray-500">
                 {documents.length} document{documents.length !== 1 ? 's' : ''}
               </div>
-              <div className="flex items-center gap-1.5 text-sm text-gray-500 border-l border-gray-200 pl-4">
-                <span>Built with</span>
-                <a
-                  href="https://case.dev"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 hover:text-gray-700 transition-colors"
-                >
-                  <img
-                    src="/casedev-logo.svg"
-                    alt="Case.dev"
-                    className="h-5 w-5"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                  <span className="font-medium">case.dev</span>
-                </a>
-              </div>
+              <a
+                href="https://case.dev"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              >
+                <span>built with</span>
+                <img
+                  src="/casedev-logo.svg"
+                  alt="Case.dev"
+                  className="h-3.5 w-3.5"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <span className="font-semibold">case.dev</span>
+              </a>
             </div>
           </div>
         </div>
