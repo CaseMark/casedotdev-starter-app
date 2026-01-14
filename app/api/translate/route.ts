@@ -106,8 +106,10 @@ export async function POST(request: NextRequest) {
 
     // Normalize language codes: zh-CN and zh-TW should just be 'zh' for Google Translate
     // Google Translate API uses simple language codes
+    const originalSourceLanguage = sourceLanguage;
     if (sourceLanguage === 'zh-CN' || sourceLanguage === 'zh-TW') {
       sourceLanguage = 'zh';
+      console.log(`[Translate] Normalized ${originalSourceLanguage} -> ${sourceLanguage}`);
     }
 
     console.log(`[Translate] Request: ${sourceLanguage} -> en, ${text.length} chars`);
@@ -166,23 +168,34 @@ export async function POST(request: NextRequest) {
       const chunk = chunks[i];
       console.log(`[Translate] Chunk ${i + 1}/${chunks.length} (${chunk.length} chars)...`);
 
+      const requestBody = JSON.stringify({
+        q: chunk,
+        source: sourceLanguage,
+        target: 'en',
+        format: 'html',  // Tell API to preserve HTML tags
+      });
+
       const response = await fetch(`${API_BASE_URL}/translate/v1/translate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(requestBody, 'utf8').toString(),
         },
-        body: JSON.stringify({
-          q: chunk,
-          source: sourceLanguage,
-          target: 'en',
-          format: 'html',  // Tell API to preserve HTML tags
-        }),
+        body: requestBody,
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Translate] API error for ${sourceLanguage}: ${response.status} - ${errorText}`);
+        console.error(`[Translate] API error for ${sourceLanguage}:`);
+        console.error(`  Status: ${response.status}`);
+        console.error(`  Response: ${errorText}`);
+        console.error(`  Request body:`, JSON.stringify({
+          q: chunk.substring(0, 100) + '...',
+          source: sourceLanguage,
+          target: 'en',
+          format: 'html'
+        }, null, 2));
         const langName = LANGUAGE_CODES[sourceLanguage] || sourceLanguage;
         throw new Error(`Translation API error for ${langName}: ${response.status}. The language code "${sourceLanguage}" may not be supported by the translation service.`);
       }
