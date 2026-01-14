@@ -59,15 +59,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Use Case.dev Translation API for language detection
+    const requestBody = {
+      q: text.slice(0, 5000), // Use first 5000 chars for detection
+    };
+
     const response = await fetch(`${API_BASE_URL}/translate/v1/detect`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        q: text.slice(0, 5000), // Use first 5000 chars for detection
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

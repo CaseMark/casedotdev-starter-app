@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import {
-  Info,
   X,
   ArrowSquareOut,
   Lightning,
@@ -13,7 +12,6 @@ import { cn } from "@/lib/utils";
 interface DemoBannerProps {
   position?: "top" | "bottom";
   dismissible?: boolean;
-  showLimitations?: boolean;
   className?: string;
   variant?: "default" | "compact" | "floating";
 }
@@ -35,15 +33,11 @@ interface LimitsSummary {
 export function DemoBanner({
   position = "top",
   dismissible = true,
-  showLimitations = false,
   className,
   variant = "default",
 }: DemoBannerProps) {
   const [dismissed, setDismissed] = useState(false);
-  const [expanded, setExpanded] = useState(showLimitations);
   const [config, setConfig] = useState<DemoConfig | null>(null);
-  const [limits, setLimits] = useState<LimitsSummary | null>(null);
-  const [disabledFeatures, setDisabledFeatures] = useState<string[]>([]);
 
   useEffect(() => {
     async function fetchConfig() {
@@ -52,8 +46,6 @@ export function DemoBanner({
         if (response.ok) {
           const data = await response.json();
           setConfig(data.config);
-          setLimits(data.limitsSummary);
-          setDisabledFeatures(data.disabledFeatures || []);
         }
       } catch {
         setConfig({
@@ -171,12 +163,6 @@ export function DemoBanner({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-sm text-amber-700 underline hover:no-underline dark:text-amber-300"
-            >
-              {expanded ? "Hide limitations" : "View limitations"}
-            </button>
             {config.upgradeUrl && config.upgradeUrl !== "#" && (
               <a
                 href={config.upgradeUrl}
@@ -199,76 +185,6 @@ export function DemoBanner({
             )}
           </div>
         </div>
-
-        {expanded && limits && (
-          <div className="mt-3 border-t border-amber-200 pt-3 dark:border-amber-700">
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
-                  <Info className="h-3 w-3" />
-                  Token Limits
-                </h4>
-                <ul className="space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
-                  {limits.tokens.map((limit, i) => (
-                    <li key={i} className="flex items-center gap-1">
-                      <span className="h-1 w-1 rounded-full bg-amber-500" />
-                      {limit}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
-                  <Info className="h-3 w-3" />
-                  Document Limits
-                </h4>
-                <ul className="space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
-                  {limits.ocr.map((limit, i) => (
-                    <li key={i} className="flex items-center gap-1">
-                      <span className="h-1 w-1 rounded-full bg-amber-500" />
-                      {limit}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {disabledFeatures.length > 0 && (
-                <div>
-                  <h4 className="mb-1.5 flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
-                    <Info className="h-3 w-3" />
-                    Feature Limits
-                  </h4>
-                  <ul className="space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
-                    {disabledFeatures.slice(0, 5).map((feature, i) => (
-                      <li key={i} className="flex items-center gap-1">
-                        <span className="h-1 w-1 rounded-full bg-amber-500" />
-                        {feature}
-                      </li>
-                    ))}
-                    {disabledFeatures.length > 5 && (
-                      <li className="text-amber-600 dark:text-amber-400">
-                        +{disabledFeatures.length - 5} more features
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {config.contactEmail && (
-              <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
-                Questions about upgrading?{" "}
-                <a
-                  href={`mailto:${config.contactEmail}`}
-                  className="underline hover:no-underline"
-                >
-                  Contact us at {config.contactEmail}
-                </a>
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

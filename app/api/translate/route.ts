@@ -40,47 +40,8 @@ const LANGUAGE_CODES: Record<string, string> = {
   en: 'English',
 };
 
-// Markers to preserve formatting through Google Translate
-// Using XML-style tags that translation APIs typically preserve
-const PRESERVE_MARKERS = {
-  DOUBLE_NEWLINE: '<x id="p"/>',  // \n\n -> preserve paragraph breaks
-  SINGLE_NEWLINE: '<x id="n"/>',  // \n -> preserve line breaks
-};
-
-// Replace newlines with markers before translation
-function preserveFormatting(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')  // Normalize line endings
-    .replace(/\n\n+/g, PRESERVE_MARKERS.DOUBLE_NEWLINE)  // Paragraph breaks
-    .replace(/\n/g, PRESERVE_MARKERS.SINGLE_NEWLINE);     // Single line breaks
-}
-
-// Decode HTML entities that Google Translate may produce
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ');
-}
-
-// Restore newlines from markers after translation
-function restoreFormatting(text: string): string {
-  // First decode HTML entities
-  let result = decodeHtmlEntities(text);
-
-  // Handle variations Google Translate might produce (with/without spaces, encoded, etc.)
-  result = result
-    .replace(/<x\s+id\s*=\s*"p"\s*\/?>/gi, '\n\n')
-    .replace(/<x\s+id\s*=\s*"n"\s*\/?>/gi, '\n');
-
-  return result;
-}
+// Note: Newlines are preserved naturally by the translation API
+// No special formatting markers needed
 
 export async function POST(request: NextRequest) {
   const apiKey = getApiKey();
@@ -126,9 +87,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Translate] Translating from ${sourceLanguage} to English...`);
 
-    // Preserve formatting by replacing newlines with Unicode PUA markers
-    const preservedText = preserveFormatting(text);
-    console.log(`[Translate] Preserved formatting: ${text.length} -> ${preservedText.length} chars`);
+    // For now, just send text as-is without formatting markers
+    // Newlines will be preserved naturally by the translation API
+    const preservedText = text;
+    console.log(`[Translate] Text length: ${text.length} chars`);
 
     // Split into chunks if needed (Translation API has size limits)
     const maxChunkSize = 4000;
@@ -168,21 +130,20 @@ export async function POST(request: NextRequest) {
       const chunk = chunks[i];
       console.log(`[Translate] Chunk ${i + 1}/${chunks.length} (${chunk.length} chars)...`);
 
-      const requestBody = JSON.stringify({
+      const requestBody = {
         q: chunk,
         source: sourceLanguage,
         target: 'en',
-        format: 'html',  // Tell API to preserve HTML tags
-      });
+        format: 'text',  // Using 'text' without formatting markers to avoid 411 error
+      };
 
       const response = await fetch(`${API_BASE_URL}/translate/v1/translate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(requestBody, 'utf8').toString(),
         },
-        body: requestBody,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -211,10 +172,9 @@ export async function POST(request: NextRequest) {
       translatedChunks.push(translatedChunk);
     }
 
-    // Join chunks and restore formatting
-    const joinedTranslation = translatedChunks.join('');
-    const fullTranslation = restoreFormatting(joinedTranslation);
-    console.log(`[Translate] Complete: ${fullTranslation.length} chars (formatting restored)`);
+    // Join chunks - newlines are preserved naturally
+    const fullTranslation = translatedChunks.join('');
+    console.log(`[Translate] Complete: ${fullTranslation.length} chars`);
 
     // Calculate approximate cost based on character count
     // Case.dev API pricing: Translation is typically $0.10-0.50 per 1000 characters

@@ -44,13 +44,44 @@ async function extractTextFromPDF(file: File): Promise<ExtractionResult> {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
 
-      // Extract text items and join them
-      const pageText = textContent.items
-        .map((item) => ('str' in item ? (item as { str: string }).str : ''))
-        .join(' ');
+      // Reconstruct text with original layout using position information
+      const items = textContent.items;
+      let pageText = '';
+      let lastY = -1;
+      let lastX = -1;
+
+      for (let j = 0; j < items.length; j++) {
+        const item = items[j];
+        if (!('str' in item)) continue;
+
+        const textItem = item as any;
+        const str = textItem.str;
+        if (!str) continue;
+
+        const transform = textItem.transform;
+        const x = transform[4]; // X position
+        const y = transform[5]; // Y position
+
+        // Detect line breaks based on Y position change
+        if (lastY !== -1 && Math.abs(y - lastY) > 5) {
+          // Significant Y change = new line
+          pageText += '\n';
+          lastX = -1;
+        } else if (lastX !== -1 && x - lastX > 50) {
+          // Large horizontal gap = likely a tab or column break
+          pageText += ' ';
+        } else if (lastX !== -1 && str.trim() && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+          // Add space between words if needed
+          pageText += ' ';
+        }
+
+        pageText += str;
+        lastY = y;
+        lastX = x + (textItem.width || 0);
+      }
 
       if (pageText.trim()) {
-        textParts.push(pageText);
+        textParts.push(pageText.trim());
       }
     }
 

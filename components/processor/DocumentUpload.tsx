@@ -147,40 +147,12 @@ export default function DocumentUpload({
       // Display detected language to user
       setDetectedLanguage(langCode);
       setDetectedLanguageName(langName);
-      setProgress(35);
-
-      // ========================================
-      // STEP 3: Format the original text
-      // ========================================
-      setStatus('cleaning_text');
-      setProgress(40);
-
-      let formattedOriginal = extractedText;
-      try {
-        console.log('[Upload] Formatting original text...');
-        const formatResponse = await fetch('/api/format-text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: extractedText }),
-        });
-
-        if (formatResponse.ok) {
-          const formatResult = await formatResponse.json();
-          if (formatResult.formattedText && !formatResult.skipped) {
-            formattedOriginal = formatResult.formattedText;
-            console.log(`[Upload] Original text formatted: ${formattedOriginal.length} chars`);
-          }
-        }
-      } catch (formatErr) {
-        console.warn('[Upload] Failed to format original text:', formatErr);
-      }
-
       setProgress(60);
 
       // ========================================
-      // STEP 4: Translate formatted text to English (if needed)
+      // STEP 3: Translate to English (if needed)
       // ========================================
-      let translatedText = formattedOriginal;
+      let translatedText = extractedText;
       let translationCost = 0;
 
       if (langCode !== 'en') {
@@ -199,7 +171,7 @@ export default function DocumentUpload({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: formattedOriginal,
+            text: extractedText,
             sourceLanguage: normalizedLangCode,
           }),
         });
@@ -233,7 +205,7 @@ export default function DocumentUpload({
         id: generateId(),
         filename: file.name,
         originalLanguage: langCode,
-        originalText: formattedOriginal,
+        originalText: extractedText,
         translatedText: translatedText,
         pageCount: pageCount,
         cost: translationCost,
