@@ -84,6 +84,8 @@ export async function POST(request: NextRequest) {
           relevanceScore: 50,
         },
         tokensUsed: 0,
+        cost: 0,
+        charsProcessed: 0,
       });
     }
 
@@ -164,6 +166,12 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Classify] Result: ${classification.category} (${classification.confidence})`);
 
+    // Calculate cost based on character count
+    // Using $0.30 per 1000 characters as estimate
+    const costPerThousandChars = 0.30;
+    const charCount = documentContext.length;
+    const cost = (charCount / 1000) * costPerThousandChars;
+
     return NextResponse.json({
       success: true,
       classification: {
@@ -175,6 +183,8 @@ export async function POST(request: NextRequest) {
         relevanceScore: classification.relevanceScore,
       },
       tokensUsed: data.usage?.total_tokens || 0,
+      cost: cost, // Cost in dollars
+      charsProcessed: charCount,
     });
   } catch (error) {
     console.error('[Classify] Error:', error);

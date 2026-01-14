@@ -10,18 +10,9 @@ function parseEnvInt(key: string, defaultValue: number): number {
 }
 
 export const DEMO_LIMITS = {
-  // Document limits
-  maxDocumentsStored: parseEnvInt('DEMO_MAX_DOCUMENTS', 10), // Max docs stored at a time
-  maxFileSizeBytes: parseEnvInt('DEMO_MAX_FILE_SIZE', 5 * 1024 * 1024), // 5MB
+  // File size limits
+  maxFileSizeBytes: parseEnvInt('DEMO_MAX_FILE_SIZE', 10 * 1024 * 1024), // 10MB
   maxTotalStorageBytes: parseEnvInt('DEMO_MAX_STORAGE', 50 * 1024 * 1024), // 50MB total
-
-  // API call limits (per session)
-  maxClassificationsPerSession: parseEnvInt('DEMO_MAX_CLASSIFICATIONS', 50),
-  maxSearchesPerSession: parseEnvInt('DEMO_MAX_SEARCHES', 50),
-
-  // Token limits (for LLM calls)
-  tokensPerClassification: parseEnvInt('DEMO_TOKENS_PER_CLASSIFICATION', 2000),
-  tokensPerSession: parseEnvInt('DEMO_TOKENS_PER_SESSION', 20000),
 
   // Supported file types
   supportedFileTypes: [
@@ -41,10 +32,8 @@ export const DEMO_LIMITS = {
 
 // Human-readable descriptions for UI
 export const LIMIT_DESCRIPTIONS = {
-  maxDocuments: `Up to ${DEMO_LIMITS.maxDocumentsStored} documents at a time`,
   maxFileSize: `Max ${(DEMO_LIMITS.maxFileSizeBytes / (1024 * 1024)).toFixed(0)}MB per file`,
   maxStorage: `${(DEMO_LIMITS.maxTotalStorageBytes / (1024 * 1024)).toFixed(0)}MB total storage`,
-  maxClassifications: `${DEMO_LIMITS.maxClassificationsPerSession} AI classifications per session`,
   supportedTypes: 'PDF, TXT, JPG, PNG, GIF, WEBP, DOC, DOCX',
 };
 
@@ -52,7 +41,7 @@ export const LIMIT_DESCRIPTIONS = {
 export const UPGRADE_MESSAGES = {
   documentLimit: {
     title: 'Document Limit Reached',
-    description: `You can store up to ${DEMO_LIMITS.maxDocumentsStored} documents at a time. Delete some documents to upload more, or upgrade for unlimited storage.`,
+    description: 'You\'ve reached the demo document limit. Delete some documents to upload more, or upgrade for unlimited storage.',
     cta: 'Upgrade to Pro',
   },
   storageLimit: {
@@ -60,9 +49,9 @@ export const UPGRADE_MESSAGES = {
     description: 'You\'ve reached the demo storage limit. Upgrade to unlock more storage.',
     cta: 'Upgrade to Pro',
   },
-  classificationLimit: {
-    title: 'Classification Limit Reached',
-    description: 'You\'ve used all AI classifications for this session. Upgrade for unlimited classifications.',
+  priceLimit: {
+    title: 'Session Limit Reached',
+    description: 'You\'ve reached the demo session price limit. Upgrade for unlimited processing.',
     cta: 'Upgrade to Pro',
   },
   fileTooLarge: {

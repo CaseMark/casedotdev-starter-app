@@ -203,20 +203,61 @@ export function getEvidenceByDate(): Map<string, EvidenceItem[]> {
   return new Map(sortedEntries);
 }
 
+// Helper function to get session reset time
+function getSessionResetTime(sessionHours: number = 24): string {
+  const resetTime = new Date();
+  resetTime.setHours(resetTime.getHours() + sessionHours);
+  return resetTime.toISOString();
+}
+
 // Session statistics
 export function getSessionStats(): SessionStats {
+  const defaultStats: SessionStats = {
+    documentsUploaded: 0,
+    classificationsUsed: 0,
+    totalStorageUsed: 0,
+    sessionPrice: 0,
+    sessionStartAt: new Date().toISOString(),
+    sessionResetAt: getSessionResetTime(24),
+  };
+
   if (typeof window === 'undefined') {
-    return { documentsUploaded: 0, classificationsUsed: 0, totalStorageUsed: 0 };
+    return defaultStats;
   }
 
   try {
     const stored = localStorage.getItem(STATS_KEY);
     if (!stored) {
-      return { documentsUploaded: 0, classificationsUsed: 0, totalStorageUsed: 0 };
+      return defaultStats;
     }
-    return JSON.parse(stored) as SessionStats;
+
+    const stats = JSON.parse(stored) as SessionStats;
+
+    // Initialize price fields if they don't exist (backward compatibility)
+    if (stats.sessionPrice === undefined) {
+      stats.sessionPrice = 0;
+      stats.sessionStartAt = new Date().toISOString();
+      stats.sessionResetAt = getSessionResetTime(24);
+    }
+
+    // Check if session reset needed
+    const now = new Date();
+    if (now >= new Date(stats.sessionResetAt)) {
+      const resetStats: SessionStats = {
+        documentsUploaded: 0,
+        classificationsUsed: 0,
+        totalStorageUsed: calculateStorageUsed(),
+        sessionPrice: 0,
+        sessionStartAt: now.toISOString(),
+        sessionResetAt: getSessionResetTime(24),
+      };
+      localStorage.setItem(STATS_KEY, JSON.stringify(resetStats));
+      return resetStats;
+    }
+
+    return stats;
   } catch {
-    return { documentsUploaded: 0, classificationsUsed: 0, totalStorageUsed: 0 };
+    return defaultStats;
   }
 }
 
@@ -236,6 +277,11 @@ export function incrementDocumentsUploaded(): void {
 export function incrementClassificationsUsed(): void {
   const stats = getSessionStats();
   updateSessionStats({ classificationsUsed: stats.classificationsUsed + 1 });
+}
+
+export function incrementSessionPrice(price: number): void {
+  const stats = getSessionStats();
+  updateSessionStats({ sessionPrice: stats.sessionPrice + price });
 }
 
 // Calculate total storage used
@@ -299,4 +345,18 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Calculate time remaining until session reset
+export function calculateTimeRemaining(resetAt: string): string {
+  const now = new Date();
+  const reset = new Date(resetAt);
+  const diff = reset.getTime() - now.getTime();
+
+  if (diff <= 0) return '0h 0m';
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  return `${hours}h ${minutes}m`;
 }

@@ -45,10 +45,12 @@ import {
   getSessionStats,
   incrementDocumentsUploaded,
   incrementClassificationsUsed,
+  incrementSessionPrice,
   calculateStorageUsed,
   generateId,
   formatFileSize,
   searchEvidence,
+  calculateTimeRemaining,
 } from '@/lib/evidence-storage';
 import {
   DEMO_LIMITS,
@@ -57,8 +59,10 @@ import {
   isFileTypeSupported,
   isFileSizeValid,
 } from '@/lib/demo-limits';
+import { DEMO_LIMITS as CONFIG_LIMITS } from '@/lib/demo-limits/config';
 import { cn } from '@/lib/utils';
 import { DemoModeBanner } from '@/components/demo-mode-banner';
+import { UsageStatsCard } from '@/components/demo/UsageMeter';
 import { generatePdfThumbnail, extractPdfTextClient } from '@/lib/pdf-utils';
 
 // Category icons mapping
@@ -100,7 +104,7 @@ export default function EvidenceTriagePage() {
   const [deletingEvidence, setDeletingEvidence] = useState<Set<string>>(new Set());
   const [viewingEvidence, setViewingEvidence] = useState<EvidenceItem | null>(null);
   const [limitWarning, setLimitWarning] = useState<string | null>(null);
-  const [sessionStats, setSessionStats] = useState({ documentsUploaded: 0, classificationsUsed: 0 });
+  const [sessionStats, setSessionStats] = useState(getSessionStats());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -133,7 +137,7 @@ export default function EvidenceTriagePage() {
 
     // Check document limit against currently stored documents
     const currentDocCount = getAllEvidence().length;
-    if (currentDocCount >= DEMO_LIMITS.maxDocumentsStored) {
+    if (currentDocCount >= CONFIG_LIMITS.documents.maxDocumentsPerSession) {
       setLimitWarning('documentLimit');
       return;
     }
@@ -177,7 +181,7 @@ export default function EvidenceTriagePage() {
 
       // Check if we've hit the limit during processing
       const currentCount = getAllEvidence().length;
-      if (currentCount >= DEMO_LIMITS.maxDocumentsStored) {
+      if (currentCount >= CONFIG_LIMITS.documents.maxDocumentsPerSession) {
         setUploadProgress(prev => prev.map((p, idx) =>
           idx === i ? { ...p, status: 'failed', error: 'Document limit reached' } : p
         ));
@@ -269,9 +273,15 @@ export default function EvidenceTriagePage() {
               if (extractResponse.ok) {
                 const extractResult = await extractResponse.json();
                 const serverText = extractResult.text || '';
+                const extractCost = extractResult.cost || 0;
                 // Use server result if it's longer (better OCR)
                 if (serverText.length > extractedText.length) {
                   extractedText = serverText;
+                }
+                // Track OCR cost
+                if (extractCost > 0) {
+                  incrementSessionPrice(extractCost);
+                  setSessionStats(getSessionStats());
                 }
               }
             } catch (err) {
@@ -291,9 +301,11 @@ export default function EvidenceTriagePage() {
           idx === i ? { ...p, status: 'classifying', progress: 70 } : p
         ));
 
-        // Check classification limit
+        // Check session price limit before classification
         const currentStats = getSessionStats();
-        if (currentStats.classificationsUsed < DEMO_LIMITS.maxClassificationsPerSession) {
+        const priceLimit = CONFIG_LIMITS.pricing.sessionPriceLimit;
+
+        if (currentStats.sessionPrice < priceLimit) {
           try {
             const classifyResponse = await fetch('/api/classify', {
               method: 'POST',
@@ -308,6 +320,7 @@ export default function EvidenceTriagePage() {
             if (classifyResponse.ok) {
               const classifyResult = await classifyResponse.json();
               const classification = classifyResult.classification;
+              const cost = classifyResult.cost || 0;
 
               updateEvidence(evidenceId, {
                 category: classification.category,
@@ -318,7 +331,11 @@ export default function EvidenceTriagePage() {
                 status: 'completed',
               });
 
+              // Track classification count and cost
               incrementClassificationsUsed();
+              if (cost > 0) {
+                incrementSessionPrice(cost);
+              }
               setSessionStats(getSessionStats());
             } else {
               updateEvidence(evidenceId, { status: 'completed' });
@@ -328,6 +345,7 @@ export default function EvidenceTriagePage() {
             updateEvidence(evidenceId, { status: 'completed' });
           }
         } else {
+          // Price limit reached, complete without classification
           updateEvidence(evidenceId, { status: 'completed' });
         }
 
@@ -675,7 +693,7 @@ export default function EvidenceTriagePage() {
               <span className="font-semibold">case.dev</span>
             </a>
             <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-              {evidence.length}/{DEMO_LIMITS.maxDocumentsStored} docs
+              {evidence.length}/{CONFIG_LIMITS.documents.maxDocumentsPerSession} docs
             </div>
           </div>
 
@@ -855,14 +873,15 @@ export default function EvidenceTriagePage() {
               </select>
             </div>
 
-            {/* Demo Limits Info */}
+            {/* Usage Stats */}
             <div className="mt-6 pt-6 border-t border-border">
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">Demo Limits</h3>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p>{LIMIT_DESCRIPTIONS.maxDocuments}</p>
-                <p>{LIMIT_DESCRIPTIONS.maxFileSize}</p>
-                <p>{LIMIT_DESCRIPTIONS.supportedTypes}</p>
-              </div>
+              <UsageStatsCard
+                documentsUsed={sessionStats.documentsUploaded}
+                documentsLimit={CONFIG_LIMITS.documents.maxDocumentsPerSession}
+                priceUsed={sessionStats.sessionPrice}
+                priceLimit={CONFIG_LIMITS.pricing.sessionPriceLimit}
+                timeRemaining={calculateTimeRemaining(sessionStats.sessionResetAt)}
+              />
             </div>
           </div>
         </aside>

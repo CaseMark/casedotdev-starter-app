@@ -128,10 +128,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Search] Found ${results.length} relevant documents`);
 
+    // Calculate cost based on character count
+    // Using $0.30 per 1000 characters as estimate
+    const costPerThousandChars = 0.30;
+    const charCount = `Search Query: "${query}"\n\nDocuments:\n${documentList}`.length;
+    const cost = (charCount / 1000) * costPerThousandChars;
+
     return NextResponse.json({
       success: true,
       results,
       tokensUsed: data.usage?.total_tokens || 0,
+      cost: cost, // Cost in dollars
+      charsProcessed: charCount,
     });
   } catch (error) {
     console.error('[Search] Error:', error);

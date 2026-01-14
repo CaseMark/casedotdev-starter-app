@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Lightning } from "@phosphor-icons/react";
+import { X, Lightning, ArrowSquareOut } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 interface DemoModeBannerProps {
@@ -51,6 +51,15 @@ export function DemoModeBanner({
           </div>
 
           <div className="flex items-center gap-2">
+            <a
+              href="https://case.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+            >
+              Upgrade Now
+              <ArrowSquareOut className="h-3.5 w-3.5" />
+            </a>
             {dismissible && (
               <button
                 onClick={handleDismiss}

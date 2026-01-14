@@ -113,4 +113,8 @@ export interface SessionStats {
   documentsUploaded: number;
   classificationsUsed: number;
   totalStorageUsed: number;
+  // Price-based tracking
+  sessionPrice: number; // Total price used in current session
+  sessionStartAt: string; // When the current session started
+  sessionResetAt: string; // When the session should reset
 }
