@@ -1,12 +1,12 @@
 /**
- * Client-side document processor for extracting text from PDFs and text files.
- * Uses pdfjs-dist for PDF text extraction (fast, no API needed).
+ * Client-side document processor for extracting text from PDFs, RTF files, and text files.
+ * Uses pdfjs-dist for PDF text extraction and rtf-parser for RTF files (fast, no API needed).
  */
 
 export interface ExtractionResult {
   text: string;
   pageCount: number;
-  method: 'pdf-text' | 'plain-text';
+  method: 'pdf-text' | 'plain-text' | 'rtf-text';
 }
 
 // Dynamically load PDF.js
@@ -88,6 +88,66 @@ async function extractTextFromPlainText(file: File): Promise<ExtractionResult> {
 }
 
 /**
+ * Extract text from an RTF file using rtf-parser
+ */
+async function extractTextFromRTF(file: File): Promise<ExtractionResult> {
+  try {
+    // Dynamically import rtf-parser
+    const parseRTF = await import('rtf-parser');
+    const rtfString = await file.text();
+
+    // Parse RTF using callback-based API wrapped in a promise
+    const rtfDoc = await new Promise<any>((resolve, reject) => {
+      parseRTF.default.string(rtfString, (err: Error | null, doc: any) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(doc);
+        }
+      });
+    });
+
+    // Extract plain text from RTF document
+    // Structure: RTFDocument -> paragraphs -> spans with 'value' property
+    const textParts: string[] = [];
+
+    if (rtfDoc.content && Array.isArray(rtfDoc.content)) {
+      for (const paragraph of rtfDoc.content) {
+        const paragraphText: string[] = [];
+
+        if (paragraph.content && Array.isArray(paragraph.content)) {
+          for (const span of paragraph.content) {
+            // RTFSpan objects have a 'value' property with the text
+            if (span.value) {
+              paragraphText.push(span.value);
+            }
+          }
+        }
+
+        // Join spans in a paragraph and add to text parts
+        if (paragraphText.length > 0) {
+          textParts.push(paragraphText.join(''));
+        }
+      }
+    }
+
+    // Join paragraphs with newlines
+    const text = textParts.join('\n');
+
+    console.log(`[DocProcessor] Extracted ${text.length} chars from RTF (${textParts.length} paragraphs)`);
+
+    return {
+      text: text.trim(),
+      pageCount: 1,
+      method: 'rtf-text',
+    };
+  } catch (error) {
+    console.error('[DocProcessor] RTF extraction error:', error);
+    throw new Error('Failed to extract text from RTF file. Please ensure the file is a valid RTF document.');
+  }
+}
+
+/**
  * Convert a file to base64 for server-side OCR
  */
 export async function fileToBase64(file: File): Promise<string> {
@@ -110,6 +170,7 @@ export async function fileToBase64(file: File): Promise<string> {
  */
 export async function processDocument(file: File): Promise<ExtractionResult> {
   const mimeType = file.type;
+  const fileName = file.name.toLowerCase();
 
   console.log(`[DocProcessor] Processing ${file.name} (${mimeType})`);
 
@@ -121,5 +182,10 @@ export async function processDocument(file: File): Promise<ExtractionResult> {
     return extractTextFromPDF(file);
   }
 
-  throw new Error(`Unsupported file type: ${mimeType}. Only PDF and text files are supported.`);
+  // Handle RTF files (MIME type can be application/rtf or text/rtf, or empty for .rtf files)
+  if (mimeType === 'application/rtf' || mimeType === 'text/rtf' || fileName.endsWith('.rtf')) {
+    return extractTextFromRTF(file);
+  }
+
+  throw new Error(`Unsupported file type: ${mimeType}. Only PDF, RTF, and text files are supported.`);
 }

@@ -30,12 +30,17 @@ export const SUPPORTED_LANGUAGES = {
   tl: { name: 'Tagalog', nativeName: 'Tagalog', flag: '🇵🇭' },
   // East Asian
   zh: { name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
+  'zh-CN': { name: 'Chinese (Simplified)', nativeName: '简体中文', flag: '🇨🇳' },
+  'zh-TW': { name: 'Chinese (Traditional)', nativeName: '繁體中文', flag: '🇹🇼' },
   ja: { name: 'Japanese', nativeName: '日本語', flag: '🇯🇵' },
   ko: { name: 'Korean', nativeName: '한국어', flag: '🇰🇷' },
   // South Asian
   hi: { name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
   bn: { name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩' },
   ta: { name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' },
+  te: { name: 'Telugu', nativeName: 'తెలుగు', flag: '🇮🇳' },
+  mr: { name: 'Marathi', nativeName: 'मराठी', flag: '🇮🇳' },
+  ur: { name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰' },
   // Middle Eastern
   ar: { name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
   he: { name: 'Hebrew', nativeName: 'עברית', flag: '🇮🇱' },
@@ -43,10 +48,39 @@ export const SUPPORTED_LANGUAGES = {
   // Cyrillic
   ru: { name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
   uk: { name: 'Ukrainian', nativeName: 'Українська', flag: '🇺🇦' },
+  bg: { name: 'Bulgarian', nativeName: 'Български', flag: '🇧🇬' },
+  sr: { name: 'Serbian', nativeName: 'Српски', flag: '🇷🇸' },
   // Greek
   el: { name: 'Greek', nativeName: 'Ελληνικά', flag: '🇬🇷' },
   // Thai
   th: { name: 'Thai', nativeName: 'ไทย', flag: '🇹🇭' },
+  // Additional languages
+  af: { name: 'Afrikaans', nativeName: 'Afrikaans', flag: '🇿🇦' },
+  sq: { name: 'Albanian', nativeName: 'Shqip', flag: '🇦🇱' },
+  am: { name: 'Amharic', nativeName: 'አማርኛ', flag: '🇪🇹' },
+  hy: { name: 'Armenian', nativeName: 'Հայերեն', flag: '🇦🇲' },
+  az: { name: 'Azerbaijani', nativeName: 'Azərbaycan', flag: '🇦🇿' },
+  eu: { name: 'Basque', nativeName: 'Euskara', flag: '🇪🇸' },
+  be: { name: 'Belarusian', nativeName: 'Беларуская', flag: '🇧🇾' },
+  bs: { name: 'Bosnian', nativeName: 'Bosanski', flag: '🇧🇦' },
+  ca: { name: 'Catalan', nativeName: 'Català', flag: '🇪🇸' },
+  et: { name: 'Estonian', nativeName: 'Eesti', flag: '🇪🇪' },
+  ka: { name: 'Georgian', nativeName: 'ქართული', flag: '🇬🇪' },
+  gu: { name: 'Gujarati', nativeName: 'ગુજરાતી', flag: '🇮🇳' },
+  kn: { name: 'Kannada', nativeName: 'ಕನ್ನಡ', flag: '🇮🇳' },
+  kk: { name: 'Kazakh', nativeName: 'Қазақ', flag: '🇰🇿' },
+  km: { name: 'Khmer', nativeName: 'ខ្មែរ', flag: '🇰🇭' },
+  lo: { name: 'Lao', nativeName: 'ລາວ', flag: '🇱🇦' },
+  lv: { name: 'Latvian', nativeName: 'Latviešu', flag: '🇱🇻' },
+  lt: { name: 'Lithuanian', nativeName: 'Lietuvių', flag: '🇱🇹' },
+  mk: { name: 'Macedonian', nativeName: 'Македонски', flag: '🇲🇰' },
+  ml: { name: 'Malayalam', nativeName: 'മലയാളം', flag: '🇮🇳' },
+  mn: { name: 'Mongolian', nativeName: 'Монгол', flag: '🇲🇳' },
+  my: { name: 'Burmese', nativeName: 'မြန်မာ', flag: '🇲🇲' },
+  ne: { name: 'Nepali', nativeName: 'नेपाली', flag: '🇳🇵' },
+  pa: { name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', flag: '🇮🇳' },
+  si: { name: 'Sinhala', nativeName: 'සිංහල', flag: '🇱🇰' },
+  sw: { name: 'Swahili', nativeName: 'Kiswahili', flag: '🇰🇪' },
   // English (target language)
   en: { name: 'English', nativeName: 'English', flag: '🇺🇸' },
 } as const;

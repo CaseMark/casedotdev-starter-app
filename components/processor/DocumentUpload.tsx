@@ -7,6 +7,7 @@ import { DEMO_LIMITS } from '@/lib/demo-limits/config';
 import { UsageMeter } from '@/components/demo/UsageMeter';
 import { LimitWarning } from '@/components/demo/LimitWarning';
 import { processDocument } from '@/lib/document-processor';
+import { loadUsage } from '@/lib/storage/document-storage';
 
 interface DocumentUploadProps {
   onDocumentProcessed: (document: {
@@ -16,11 +17,13 @@ interface DocumentUploadProps {
     originalText: string;
     translatedText: string;
     pageCount: number;
+    cost?: number;
   }) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
   documentsUsed: number;
   tokensUsed: number;
+  priceUsed?: number;
 }
 
 const STATUS_MESSAGES: Record<ProcessingStatus, string> = {
@@ -41,6 +44,7 @@ export default function DocumentUpload({
   setIsProcessing,
   documentsUsed,
   tokensUsed,
+  priceUsed = 0,
 }: DocumentUploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [status, setStatus] = useState<ProcessingStatus>('idle');
@@ -48,7 +52,7 @@ export default function DocumentUpload({
   const [detectedLanguage, setDetectedLanguage] = useState<LanguageCode | null>(null);
   const [detectedLanguageName, setDetectedLanguageName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [limitReached, setLimitReached] = useState<'document' | 'token' | null>(null);
+  const [limitReached, setLimitReached] = useState<'document' | 'token' | 'price' | null>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -69,16 +73,17 @@ export default function DocumentUpload({
       return;
     }
 
-    // Check token limit
-    if (tokensUsed >= DEMO_LIMITS.tokens.perSession) {
-      setLimitReached('token');
+    // Check price limit
+    if (priceUsed >= DEMO_LIMITS.pricing.sessionPriceLimit) {
+      setLimitReached('price');
       return;
     }
 
-    // Validate file type - only PDF and TXT (no images)
-    const validTypes = ['application/pdf', 'text/plain'];
-    if (!validTypes.includes(file.type)) {
-      setError('Please upload a PDF or text file. Image files are not supported in this demo.');
+    // Validate file type - only PDF, RTF, and TXT (no images)
+    const validTypes = ['application/pdf', 'text/plain', 'application/rtf', 'text/rtf'];
+    const fileName = file.name.toLowerCase();
+    if (!validTypes.includes(file.type) && !fileName.endsWith('.rtf')) {
+      setError('Please upload a PDF, RTF, or text file. Image files are not supported in this demo.');
       return;
     }
 
@@ -134,6 +139,9 @@ export default function DocumentUpload({
         langCode = (detectResult.language || 'en') as LanguageCode;
         langName = detectResult.languageName || SUPPORTED_LANGUAGES[langCode]?.name || 'Unknown';
         console.log(`[Upload] Language detected: ${langName} (${langCode})`);
+      } else {
+        // Fall back to English for errors
+        console.warn('[Upload] Language detection failed, defaulting to English');
       }
 
       // Display detected language to user
@@ -173,29 +181,39 @@ export default function DocumentUpload({
       // STEP 4: Translate formatted text to English (if needed)
       // ========================================
       let translatedText = formattedOriginal;
+      let translationCost = 0;
 
       if (langCode !== 'en') {
         setStatus('translating');
         setProgress(70);
 
-        console.log(`[Upload] Translating from ${langName} to English...`);
+        // Normalize language code for Google Translate API
+        // zh-CN and zh-TW should be normalized to 'zh'
+        let normalizedLangCode = langCode;
+        if (langCode === 'zh-CN' || langCode === 'zh-TW') {
+          normalizedLangCode = 'zh';
+        }
+
+        console.log(`[Upload] Translating from ${langName} (${langCode} -> ${normalizedLangCode}) to English...`);
         const translateResponse = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: formattedOriginal,
-            sourceLanguage: langCode,
+            sourceLanguage: normalizedLangCode,
           }),
         });
 
         if (!translateResponse.ok) {
           const errorData = await translateResponse.json();
-          throw new Error(errorData.error || 'Translation failed');
+          console.error(`[Upload] Translation failed for language ${langCode}:`, errorData);
+          throw new Error(errorData.error || `Translation from ${langName} failed. Please try again.`);
         }
 
         const translateResult = await translateResponse.json();
         translatedText = translateResult.translatedText;
-        console.log(`[Upload] Translation complete: ${translatedText.length} chars`);
+        translationCost = translateResult.cost || 0;
+        console.log(`[Upload] Translation complete: ${translatedText.length} chars, cost: $${translationCost.toFixed(4)}`);
       } else {
         console.log('[Upload] Document is in English, no translation needed');
       }
@@ -218,6 +236,7 @@ export default function DocumentUpload({
         originalText: formattedOriginal,
         translatedText: translatedText,
         pageCount: pageCount,
+        cost: translationCost,
       });
 
       // Reset after a moment
@@ -266,20 +285,42 @@ export default function DocumentUpload({
     );
   }
 
+  // Calculate time remaining for session
+  const calculateTimeRemaining = () => {
+    const usage = loadUsage();
+    const now = new Date();
+    const resetTime = new Date(usage.sessionResetAt);
+    const msRemaining = resetTime.getTime() - now.getTime();
+
+    if (msRemaining <= 0) return '0h 0m';
+
+    const hoursRemaining = Math.floor(msRemaining / (1000 * 60 * 60));
+    const minutesRemaining = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+
+    return `${hoursRemaining}h ${minutesRemaining}m`;
+  };
+
+  const formatPrice = (price: number) => `$${price.toFixed(2)}`;
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Usage Stats */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <UsageMeter
+          label="Session Limit"
+          used={priceUsed}
+          limit={DEMO_LIMITS.pricing.sessionPriceLimit}
+          unit=""
+          showPercentage={true}
+        />
+        <UsageMeter
           label="Documents"
           used={documentsUsed}
           limit={DEMO_LIMITS.ocr.maxDocumentsPerSession}
         />
-        <UsageMeter
-          label="Tokens Used"
-          used={tokensUsed}
-          limit={DEMO_LIMITS.tokens.perSession}
-        />
+      </div>
+      <div className="text-xs text-gray-500 mb-4 text-center">
+        Session resets in {calculateTimeRemaining()}
       </div>
 
       {/* Upload Area */}
@@ -302,7 +343,7 @@ export default function DocumentUpload({
           id="file-input"
           type="file"
           className="hidden"
-          accept=".pdf,.txt"
+          accept=".pdf,.txt,.rtf"
           onChange={handleFileInput}
           disabled={isProcessing}
         />
@@ -338,7 +379,7 @@ export default function DocumentUpload({
 
             {!isProcessing && status === 'idle' && (
               <p className="text-sm text-gray-500 mt-1">
-                Drag and drop a PDF or text file, or click to browse
+                Drag and drop a PDF, RTF, or text file, or click to browse
               </p>
             )}
 

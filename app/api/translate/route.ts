@@ -10,10 +10,33 @@ function getApiKey(): string | undefined {
 }
 
 const LANGUAGE_CODES: Record<string, string> = {
+  // Western European
   es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', pt: 'Portuguese', nl: 'Dutch',
+  // Central European
   pl: 'Polish', cs: 'Czech', hu: 'Hungarian', ro: 'Romanian', sk: 'Slovak', sl: 'Slovenian', hr: 'Croatian',
+  // Nordic
   sv: 'Swedish', da: 'Danish', fi: 'Finnish', no: 'Norwegian', is: 'Icelandic',
+  // Other Latin-script
   tr: 'Turkish', id: 'Indonesian', ms: 'Malay', vi: 'Vietnamese', tl: 'Tagalog',
+  // East Asian
+  zh: 'Chinese', 'zh-CN': 'Chinese (Simplified)', 'zh-TW': 'Chinese (Traditional)',
+  ja: 'Japanese', ko: 'Korean',
+  // South Asian
+  hi: 'Hindi', bn: 'Bengali', ta: 'Tamil', te: 'Telugu', mr: 'Marathi', ur: 'Urdu',
+  gu: 'Gujarati', kn: 'Kannada', ml: 'Malayalam', pa: 'Punjabi', si: 'Sinhala', ne: 'Nepali',
+  // Middle Eastern
+  ar: 'Arabic', he: 'Hebrew', fa: 'Persian',
+  // Cyrillic
+  ru: 'Russian', uk: 'Ukrainian', bg: 'Bulgarian', sr: 'Serbian', be: 'Belarusian',
+  // Greek
+  el: 'Greek',
+  // Thai and Southeast Asian
+  th: 'Thai', km: 'Khmer', lo: 'Lao', my: 'Burmese',
+  // Additional languages
+  af: 'Afrikaans', sq: 'Albanian', am: 'Amharic', hy: 'Armenian', az: 'Azerbaijani',
+  eu: 'Basque', bs: 'Bosnian', ca: 'Catalan', et: 'Estonian', ka: 'Georgian',
+  kk: 'Kazakh', lv: 'Latvian', lt: 'Lithuanian', mk: 'Macedonian', mn: 'Mongolian',
+  sw: 'Swahili',
   en: 'English',
 };
 
@@ -71,7 +94,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { text, sourceLanguage } = body;
+    let { text, sourceLanguage } = body;
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 });
@@ -80,6 +103,14 @@ export async function POST(request: NextRequest) {
     if (!sourceLanguage || typeof sourceLanguage !== 'string') {
       return NextResponse.json({ error: 'No source language provided' }, { status: 400 });
     }
+
+    // Normalize language codes: zh-CN and zh-TW should just be 'zh' for Google Translate
+    // Google Translate API uses simple language codes
+    if (sourceLanguage === 'zh-CN' || sourceLanguage === 'zh-TW') {
+      sourceLanguage = 'zh';
+    }
+
+    console.log(`[Translate] Request: ${sourceLanguage} -> en, ${text.length} chars`);
 
     // If already English, return as-is
     if (sourceLanguage === 'en') {
@@ -151,8 +182,9 @@ export async function POST(request: NextRequest) {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Translate] API error: ${response.status} - ${errorText}`);
-        throw new Error(`Translation API error: ${response.status}`);
+        console.error(`[Translate] API error for ${sourceLanguage}: ${response.status} - ${errorText}`);
+        const langName = LANGUAGE_CODES[sourceLanguage] || sourceLanguage;
+        throw new Error(`Translation API error for ${langName}: ${response.status}. The language code "${sourceLanguage}" may not be supported by the translation service.`);
       }
 
       const data = await response.json();
@@ -171,12 +203,19 @@ export async function POST(request: NextRequest) {
     const fullTranslation = restoreFormatting(joinedTranslation);
     console.log(`[Translate] Complete: ${fullTranslation.length} chars (formatting restored)`);
 
+    // Calculate approximate cost based on character count
+    // Case.dev API pricing: Translation is typically $0.10-0.50 per 1000 characters
+    // Using a conservative estimate of $0.30 per 1000 characters
+    const costPerThousandChars = 0.30;
+    const totalCost = (text.length / 1000) * costPerThousandChars;
+
     return NextResponse.json({
       success: true,
       translatedText: fullTranslation,
       sourceLanguage,
       targetLanguage: 'en',
       charsProcessed: text.length,
+      cost: totalCost, // Cost in dollars
     });
 
   } catch (error) {

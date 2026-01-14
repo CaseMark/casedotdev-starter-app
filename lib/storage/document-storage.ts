@@ -134,6 +134,10 @@ interface UsageData {
   tokensUsed: number;
   pagesProcessed: number;
   lastResetAt: string;
+  // Price-based tracking
+  sessionPrice: number; // Total price used in current session
+  sessionStartAt: string; // When the current session started
+  sessionResetAt: string; // When the session should reset
 }
 
 function getNextMidnight(): string {
@@ -143,49 +147,68 @@ function getNextMidnight(): string {
   return tomorrow.toISOString();
 }
 
+function getSessionResetTime(sessionHours: number = 24): string {
+  const resetTime = new Date();
+  resetTime.setHours(resetTime.getHours() + sessionHours);
+  return resetTime.toISOString();
+}
+
 export function loadUsage(): UsageData {
+  const defaultUsage: UsageData = {
+    documentsProcessed: 0,
+    tokensUsed: 0,
+    pagesProcessed: 0,
+    lastResetAt: getNextMidnight(),
+    sessionPrice: 0,
+    sessionStartAt: new Date().toISOString(),
+    sessionResetAt: getSessionResetTime(24),
+  };
+
   if (!isBrowser()) {
-    return {
-      documentsProcessed: 0,
-      tokensUsed: 0,
-      pagesProcessed: 0,
-      lastResetAt: getNextMidnight(),
-    };
+    return defaultUsage;
   }
 
   try {
     const stored = localStorage.getItem(USAGE_KEY);
     if (!stored) {
-      return {
-        documentsProcessed: 0,
-        tokensUsed: 0,
-        pagesProcessed: 0,
-        lastResetAt: getNextMidnight(),
-      };
+      return defaultUsage;
     }
 
     const usage = JSON.parse(stored) as UsageData;
 
-    // Check if daily reset needed
-    if (new Date() >= new Date(usage.lastResetAt)) {
-      const resetUsage = {
+    // Initialize price fields if they don't exist (backward compatibility)
+    if (usage.sessionPrice === undefined) {
+      usage.sessionPrice = 0;
+      usage.sessionStartAt = new Date().toISOString();
+      usage.sessionResetAt = getSessionResetTime(24);
+    }
+
+    // Check if session reset needed
+    const now = new Date();
+    if (now >= new Date(usage.sessionResetAt)) {
+      const resetUsage: UsageData = {
         documentsProcessed: 0,
         tokensUsed: 0,
         pagesProcessed: 0,
-        lastResetAt: getNextMidnight(),
+        lastResetAt: usage.lastResetAt, // Keep daily reset separate
+        sessionPrice: 0,
+        sessionStartAt: now.toISOString(),
+        sessionResetAt: getSessionResetTime(24),
       };
       localStorage.setItem(USAGE_KEY, JSON.stringify(resetUsage));
       return resetUsage;
     }
 
+    // Check if daily reset needed
+    if (now >= new Date(usage.lastResetAt)) {
+      usage.lastResetAt = getNextMidnight();
+      usage.pagesProcessed = 0;
+      localStorage.setItem(USAGE_KEY, JSON.stringify(usage));
+    }
+
     return usage;
   } catch {
-    return {
-      documentsProcessed: 0,
-      tokensUsed: 0,
-      pagesProcessed: 0,
-      lastResetAt: getNextMidnight(),
-    };
+    return defaultUsage;
   }
 }
 
@@ -197,12 +220,13 @@ export function updateUsage(updates: Partial<UsageData>): void {
   localStorage.setItem(USAGE_KEY, JSON.stringify(updated));
 }
 
-export function incrementUsage(tokens: number = 0, documents: number = 0, pages: number = 0): void {
+export function incrementUsage(tokens: number = 0, documents: number = 0, pages: number = 0, price: number = 0): void {
   const current = loadUsage();
   updateUsage({
     tokensUsed: current.tokensUsed + tokens,
     documentsProcessed: current.documentsProcessed + documents,
     pagesProcessed: current.pagesProcessed + pages,
+    sessionPrice: current.sessionPrice + price,
   });
 }
 

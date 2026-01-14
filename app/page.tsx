@@ -38,6 +38,8 @@ export default function Home() {
   const [highlightedChunks, setHighlightedChunks] = useState<{ original: string[]; translated: string[] } | undefined>();
   const [showExportModal, setShowExportModal] = useState(false);
   const [tokensUsed, setTokensUsed] = useState(0);
+  const [priceUsed, setPriceUsed] = useState(0);
+  const [sessionResetAt, setSessionResetAt] = useState<string>('');
   const [mounted, setMounted] = useState(false);
 
   // Load documents from localStorage on mount
@@ -49,6 +51,8 @@ export default function Home() {
     }
     const usage = loadUsage();
     setTokensUsed(usage.tokensUsed);
+    setPriceUsed(usage.sessionPrice);
+    setSessionResetAt(usage.sessionResetAt);
   }, []);
 
   // Save documents to localStorage whenever they change
@@ -66,6 +70,7 @@ export default function Home() {
     originalText: string;
     translatedText: string;
     pageCount: number;
+    cost?: number;
   }) => {
     const newDoc: ProcessedDocument = {
       ...doc,
@@ -83,8 +88,10 @@ export default function Home() {
 
     // Update usage
     const estimatedTokens = Math.ceil((doc.originalText.length + doc.translatedText.length) / 4);
-    incrementUsage(estimatedTokens, 1, doc.pageCount);
+    const cost = doc.cost || 0;
+    incrementUsage(estimatedTokens, 1, doc.pageCount, cost);
     setTokensUsed(prev => prev + estimatedTokens);
+    setPriceUsed(prev => prev + cost);
   }, []);
 
   // Handle document selection
@@ -292,8 +299,9 @@ export default function Home() {
                       Multi-Language Document Processor
                     </h2>
                     <p className="text-gray-600 max-w-lg mx-auto">
-                      Upload documents in any Latin-script language. We&apos;ll automatically detect the language,
-                      extract text with OCR, translate to English, and make everything searchable.
+                      Upload documents in 100+ languages including Chinese, Arabic, Japanese, Korean, and more.
+                      We&apos;ll automatically detect the language, extract text with OCR, translate to English,
+                      and make everything searchable.
                     </p>
                   </div>
                 )}
@@ -305,6 +313,7 @@ export default function Home() {
                   setIsProcessing={setIsProcessing}
                   documentsUsed={documents.length}
                   tokensUsed={tokensUsed}
+                  priceUsed={priceUsed}
                 />
 
                 {/* Features */}
@@ -314,9 +323,9 @@ export default function Home() {
                       <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                         <Globe className="w-6 h-6 text-orange-600" weight="bold" />
                       </div>
-                      <h3 className="font-semibold text-gray-800 mb-2">Latin Alphabet Languages</h3>
+                      <h3 className="font-semibold text-gray-800 mb-2">100+ Languages Supported</h3>
                       <p className="text-sm text-gray-600">
-                        Support for Spanish, French, German, Portuguese, Italian, and other Latin-script languages.
+                        Support for all major languages including Chinese, Japanese, Korean, Arabic, Hebrew, Russian, Hindi, and more.
                       </p>
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-gray-200">

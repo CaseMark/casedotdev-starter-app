@@ -37,6 +37,10 @@ export function UsageMeter({
   };
 
   const formatNumber = (num: number) => {
+    // If it looks like a price (small decimal number), format as currency
+    if (label.toLowerCase().includes('session') || label.toLowerCase().includes('price') || (num < 100 && num % 1 !== 0)) {
+      return `$${num.toFixed(2)}`;
+    }
     if (num >= 1000) {
       return `${(num / 1000).toFixed(1)}k`;
     }
@@ -48,7 +52,7 @@ export function UsageMeter({
       <div className="flex items-center justify-between text-xs">
         <span className="font-medium text-foreground">{label}</span>
         <span className={cn('font-mono', getTextColorClass())}>
-          {formatNumber(used)}/{formatNumber(limit)}{unit && ` ${unit}`}
+          {formatNumber(used)}/{formatNumber(limit)}{unit && unit !== '' && ` ${unit}`}
           {showPercentage && (
             <span className="ml-1">({percentage.toFixed(0)}%)</span>
           )}
@@ -79,17 +83,28 @@ interface UsageStatsCardProps {
   tokensLimit?: number;
   pagesUsed?: number;
   pagesLimit?: number;
+  // Price-based tracking
+  priceUsed?: number;
+  priceLimit?: number;
+  timeRemaining?: string;
 }
 
 export function UsageStatsCard({
   className,
   documentsUsed = 0,
-  documentsLimit = 5,
+  documentsLimit = 20,
   tokensUsed = 0,
   tokensLimit = 50000,
   pagesUsed = 0,
   pagesLimit = 50,
+  priceUsed = 0,
+  priceLimit = 5,
+  timeRemaining,
 }: UsageStatsCardProps) {
+  const formatPrice = (price: number) => {
+    return `$${price.toFixed(2)}`;
+  };
+
   return (
     <div
       className={cn(
@@ -99,23 +114,53 @@ export function UsageStatsCard({
     >
       <h3 className="text-sm font-medium text-foreground">Usage This Session</h3>
       <div className="space-y-3">
-        <UsageMeter
-          label="Token Usage"
-          used={tokensUsed}
-          limit={tokensLimit}
-          unit="tokens"
-        />
+        {/* Single Session Limit meter - shows price used and time remaining */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-foreground">Session Limit</span>
+            <span className={cn('font-mono',
+              priceUsed / priceLimit >= 1 ? 'text-destructive' :
+              priceUsed / priceLimit >= 0.9 ? 'text-destructive/80' :
+              priceUsed / priceLimit >= 0.75 ? 'text-amber-600 dark:text-amber-400' :
+              'text-muted-foreground'
+            )}>
+              {formatPrice(priceUsed)}/{formatPrice(priceLimit)}
+              <span className="ml-1">({((priceUsed / priceLimit) * 100).toFixed(0)}%)</span>
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn('h-full transition-all duration-300',
+                priceUsed / priceLimit >= 1 ? 'bg-destructive' :
+                priceUsed / priceLimit >= 0.9 ? 'bg-destructive/80' :
+                priceUsed / priceLimit >= 0.75 ? 'bg-amber-500' :
+                'bg-primary'
+              )}
+              style={{ width: `${Math.min(100, (priceUsed / priceLimit) * 100)}%` }}
+            />
+          </div>
+          {timeRemaining && (
+            <p className="text-xs text-muted-foreground">
+              Resets in {timeRemaining}
+            </p>
+          )}
+          {priceUsed / priceLimit >= 0.75 && (
+            <p className={cn('text-xs',
+              priceUsed / priceLimit >= 1 ? 'text-destructive' :
+              priceUsed / priceLimit >= 0.9 ? 'text-destructive/80' :
+              'text-amber-600 dark:text-amber-400'
+            )}>
+              {priceUsed / priceLimit >= 1
+                ? 'Limit reached'
+                : `${formatPrice(priceLimit - priceUsed)} remaining`}
+            </p>
+          )}
+        </div>
         <UsageMeter
           label="Documents"
           used={documentsUsed}
           limit={documentsLimit}
           unit="docs"
-        />
-        <UsageMeter
-          label="OCR Pages"
-          used={pagesUsed}
-          limit={pagesLimit}
-          unit="pages"
         />
       </div>
     </div>

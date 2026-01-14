@@ -19,11 +19,25 @@ export interface OCRUsage {
   dailyResetAt: string; // ISO string
 }
 
+export interface PriceUsage {
+  userId: string;
+  sessionId: string;
+  sessionPrice: number; // Total price in dollars for the session
+  sessionStartAt: string; // ISO string - when the session started
+  sessionResetAt: string; // ISO string - when the session should reset
+  lastRequestAt: string; // ISO string
+  requestCount: number;
+}
+
 export interface DemoLimits {
   tokens: {
     perRequest: number;
     perSession: number;
     perDayPerUser: number;
+  };
+  pricing: {
+    sessionHours: number;
+    sessionPriceLimit: number; // dollars
   };
   ocr: {
     maxFileSize: number; // bytes
@@ -54,6 +68,12 @@ export interface UsageStats {
     dailyUsed: number;
     dailyLimit: number;
     percentUsed: number;
+  };
+  pricing: {
+    sessionPriceUsed: number;
+    sessionPriceLimit: number;
+    percentUsed: number;
+    timeRemaining: string; // e.g., "23h 45m"
   };
   ocr: {
     documentsUsed: number;

@@ -4,7 +4,7 @@ import { Warning, ArrowSquareOut } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 
 interface LimitWarningProps {
-  type: 'token' | 'document' | 'page';
+  type: 'token' | 'document' | 'page' | 'price';
   className?: string;
   upgradeUrl?: string;
 }
@@ -13,6 +13,10 @@ const warningMessages = {
   token: {
     title: 'Token Limit Reached',
     description: 'You\'ve used all available tokens for this session. Upgrade to continue processing documents.',
+  },
+  price: {
+    title: 'Session Limit Reached',
+    description: 'You\'ve reached the $5.00 session limit. Upgrade for unlimited processing.',
   },
   document: {
     title: 'Document Limit Reached',
