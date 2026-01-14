@@ -177,9 +177,8 @@ export async function POST(request: NextRequest) {
     console.log(`[Translate] Complete: ${fullTranslation.length} chars`);
 
     // Calculate approximate cost based on character count
-    // Case.dev API pricing: Translation is typically $0.10-0.50 per 1000 characters
-    // Using a conservative estimate of $0.30 per 1000 characters
-    const costPerThousandChars = 0.30;
+    // Case.dev API pricing: Translation is $0.03 per 1000 characters
+    const costPerThousandChars = 0.03;
     const totalCost = (text.length / 1000) * costPerThousandChars;
 
     return NextResponse.json({
