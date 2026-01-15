@@ -12,6 +12,37 @@ import { organization, twoFactor } from "better-auth/plugins";
 import { ac, roles } from "./permissions";
 
 /**
+ * Get trusted origins for Better Auth
+ * Handles localhost, Vercel previews, and production URLs
+ */
+function getTrustedOrigins(): string[] {
+  const origins: string[] = [];
+
+  // Explicit app URL (production or custom)
+  if (process.env.BETTER_AUTH_URL) {
+    origins.push(process.env.BETTER_AUTH_URL);
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    origins.push(process.env.NEXT_PUBLIC_APP_URL);
+  }
+
+  // Vercel deployment URLs (preview and production)
+  if (process.env.VERCEL_URL) {
+    origins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    origins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  }
+
+  // Localhost for development
+  origins.push("http://localhost:3000");
+  origins.push("http://localhost:3001");
+
+  // Filter out empty strings and duplicates
+  return [...new Set(origins.filter(Boolean))];
+}
+
+/**
  * Main auth configuration
  *
  * SETUP REQUIRED:
@@ -33,6 +64,13 @@ export const auth = betterAuth({
    *   provider: "pg",
    * }),
    */
+
+  /**
+   * Trusted Origins
+   * Required for auth to work in Vercel sandbox/preview deployments
+   * Better Auth validates request origins to prevent CSRF attacks
+   */
+  trustedOrigins: getTrustedOrigins(),
 
   /**
    * Email & Password Authentication
