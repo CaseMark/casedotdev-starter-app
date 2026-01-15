@@ -15,11 +15,13 @@ export default function SearchPage() {
   const searchParams = useSearchParams();
   const caseId = params.caseId as string;
   const searchId = searchParams.get("searchId");
+  const queryParam = searchParams.get("q");
   const { selectCase } = useCases();
   const { currentCase } = useCurrentCase();
   const { query, setQuery, results, isSearching, error, search, loadPreviousSearch } = useSearch(caseId);
   const [minScoreFilter, setMinScoreFilter] = useState(0);
   const [hasLoadedPrevious, setHasLoadedPrevious] = useState(false);
+  const [hasExecutedQueryParam, setHasExecutedQueryParam] = useState(false);
 
   useEffect(() => {
     selectCase(caseId);
@@ -32,6 +34,15 @@ export default function SearchPage() {
       loadPreviousSearch(searchId);
     }
   }, [searchId, hasLoadedPrevious, loadPreviousSearch]);
+
+  // Execute search if q parameter is provided (e.g., from suggested questions)
+  useEffect(() => {
+    if (queryParam && !hasExecutedQueryParam && currentCase?.completedCount && currentCase.completedCount > 0) {
+      setHasExecutedQueryParam(true);
+      setQuery(queryParam);
+      search(queryParam);
+    }
+  }, [queryParam, hasExecutedQueryParam, currentCase?.completedCount, setQuery, search]);
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);

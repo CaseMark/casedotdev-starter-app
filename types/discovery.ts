@@ -212,3 +212,45 @@ export interface SearchState {
   results: SearchResult | null;
   error: string | null;
 }
+
+// ============================================================================
+// Theme Analysis Types
+// ============================================================================
+
+export type ThemeAnalysisStatus =
+  | "pending"       // Not yet started
+  | "processing"    // Analysis in progress
+  | "completed"     // Analysis complete
+  | "failed";       // Analysis failed
+
+export interface CaseTheme {
+  id: string;
+  caseId: string;
+  title: string;               // Short theme title (e.g., "Contract Breach")
+  description: string;         // 1-2 sentence description
+  relevanceScore: number;      // 0-1 score indicating prominence
+  supportingDocIds: string[];  // Document IDs supporting this theme
+  keyTerms: string[];          // Important terms/entities related to theme
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SuggestedQuestion {
+  id: string;
+  caseId: string;
+  question: string;            // The suggested question
+  themeId: string;             // Related theme
+  rationale: string;           // Why this question is useful
+  priority: number;            // 1-5, higher = more important
+  createdAt: Date;
+}
+
+export interface ThemeAnalysis {
+  id: string;
+  caseId: string;
+  documentCountAtAnalysis: number;  // For 20% threshold tracking
+  status: ThemeAnalysisStatus;
+  errorMessage?: string;
+  analyzedAt: Date;
+  createdAt: Date;
+}

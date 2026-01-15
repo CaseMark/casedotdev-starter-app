@@ -13,6 +13,9 @@ import type {
   ChunkEmbedding,
   ProcessingJob,
   SearchHistory,
+  CaseTheme,
+  SuggestedQuestion,
+  ThemeAnalysis,
 } from "@/types/discovery";
 
 // ============================================================================
@@ -48,6 +51,9 @@ class DiscoveryDatabase extends Dexie {
   users!: EntityTable<User, "id">;
   sessions!: EntityTable<Session, "id">;
   searchHistory!: EntityTable<SearchHistory, "id">;
+  themeAnalysis!: EntityTable<ThemeAnalysis, "id">;
+  caseThemes!: EntityTable<CaseTheme, "id">;
+  suggestedQuestions!: EntityTable<SuggestedQuestion, "id">;
 
   constructor() {
     super("DiscoveryDesktop");
@@ -82,6 +88,21 @@ class DiscoveryDatabase extends Dexie {
       users: "id, email",
       sessions: "id, userId, token, expiresAt",
       searchHistory: "id, caseId, searchedAt",
+    });
+
+    // Version 4: Added theme analysis tables
+    this.version(4).stores({
+      cases: "id, createdBy, organizationId, status, createdAt",
+      documents: "id, caseId, uploadedBy, status, uploadedAt, fileName",
+      chunks: "id, documentId, caseId, chunkIndex, contentHash",
+      embeddings: "id, chunkId, documentId, caseId, model",
+      processingJobs: "id, documentId, caseId, type, status, createdAt",
+      users: "id, email",
+      sessions: "id, userId, token, expiresAt",
+      searchHistory: "id, caseId, searchedAt",
+      themeAnalysis: "id, caseId, status, analyzedAt",
+      caseThemes: "id, caseId, relevanceScore",
+      suggestedQuestions: "id, caseId, themeId, priority",
     });
   }
 }
@@ -146,7 +167,7 @@ export async function updateCase(
 
 export async function deleteCase(id: string): Promise<void> {
   // Delete all related data in a transaction
-  await db.transaction("rw", [db.cases, db.documents, db.chunks, db.embeddings, db.processingJobs, db.searchHistory], async () => {
+  await db.transaction("rw", [db.cases, db.documents, db.chunks, db.embeddings, db.processingJobs, db.searchHistory, db.themeAnalysis, db.caseThemes, db.suggestedQuestions], async () => {
     // Delete embeddings for this case
     await db.embeddings.where("caseId").equals(id).delete();
     // Delete chunks for this case
@@ -157,6 +178,10 @@ export async function deleteCase(id: string): Promise<void> {
     await db.documents.where("caseId").equals(id).delete();
     // Delete search history for this case
     await db.searchHistory.where("caseId").equals(id).delete();
+    // Delete theme analysis for this case
+    await db.suggestedQuestions.where("caseId").equals(id).delete();
+    await db.caseThemes.where("caseId").equals(id).delete();
+    await db.themeAnalysis.where("caseId").equals(id).delete();
     // Delete the case
     await db.cases.delete(id);
   });
@@ -319,12 +344,15 @@ export async function deleteProcessingJobsByDocument(documentId: string): Promis
 // ============================================================================
 
 export async function clearAllData(): Promise<void> {
-  await db.transaction("rw", [db.cases, db.documents, db.chunks, db.embeddings, db.processingJobs, db.searchHistory], async () => {
+  await db.transaction("rw", [db.cases, db.documents, db.chunks, db.embeddings, db.processingJobs, db.searchHistory, db.themeAnalysis, db.caseThemes, db.suggestedQuestions], async () => {
     await db.embeddings.clear();
     await db.chunks.clear();
     await db.processingJobs.clear();
     await db.documents.clear();
     await db.searchHistory.clear();
+    await db.suggestedQuestions.clear();
+    await db.caseThemes.clear();
+    await db.themeAnalysis.clear();
     await db.cases.clear();
   });
 }
@@ -467,4 +495,124 @@ export async function deleteSearchHistory(id: string): Promise<void> {
 
 export async function deleteSearchHistoryByCase(caseId: string): Promise<void> {
   await db.searchHistory.where("caseId").equals(caseId).delete();
+}
+
+// ============================================================================
+// Theme Analysis Operations
+// ============================================================================
+
+export async function createThemeAnalysis(
+  data: Omit<ThemeAnalysis, "id" | "createdAt">
+): Promise<ThemeAnalysis> {
+  const analysis: ThemeAnalysis = {
+    ...data,
+    id: crypto.randomUUID(),
+    createdAt: new Date(),
+  };
+  await db.themeAnalysis.add(analysis);
+  return analysis;
+}
+
+export async function getThemeAnalysisByCase(caseId: string): Promise<ThemeAnalysis | undefined> {
+  return db.themeAnalysis.where("caseId").equals(caseId).first();
+}
+
+export async function updateThemeAnalysis(
+  id: string,
+  updates: Partial<Omit<ThemeAnalysis, "id" | "caseId" | "createdAt">>
+): Promise<void> {
+  await db.themeAnalysis.update(id, updates);
+}
+
+export async function deleteThemeAnalysisByCase(caseId: string): Promise<void> {
+  await db.transaction("rw", [db.themeAnalysis, db.caseThemes, db.suggestedQuestions], async () => {
+    await db.suggestedQuestions.where("caseId").equals(caseId).delete();
+    await db.caseThemes.where("caseId").equals(caseId).delete();
+    await db.themeAnalysis.where("caseId").equals(caseId).delete();
+  });
+}
+
+// ============================================================================
+// Case Theme Operations
+// ============================================================================
+
+export async function createCaseThemes(themes: Omit<CaseTheme, "id">[]): Promise<CaseTheme[]> {
+  const newThemes = themes.map((theme) => ({
+    ...theme,
+    id: crypto.randomUUID(),
+  }));
+  await db.caseThemes.bulkAdd(newThemes);
+  return newThemes;
+}
+
+export async function getThemesByCase(caseId: string): Promise<CaseTheme[]> {
+  return db.caseThemes
+    .where("caseId")
+    .equals(caseId)
+    .reverse()
+    .sortBy("relevanceScore");
+}
+
+export async function updateCaseTheme(
+  id: string,
+  updates: Partial<Omit<CaseTheme, "id" | "caseId" | "createdAt">>
+): Promise<void> {
+  await db.caseThemes.update(id, {
+    ...updates,
+    updatedAt: new Date(),
+  });
+}
+
+export async function deleteThemesByCase(caseId: string): Promise<void> {
+  await db.caseThemes.where("caseId").equals(caseId).delete();
+}
+
+// ============================================================================
+// Suggested Question Operations
+// ============================================================================
+
+export async function createSuggestedQuestions(
+  questions: Omit<SuggestedQuestion, "id">[]
+): Promise<SuggestedQuestion[]> {
+  const newQuestions = questions.map((q) => ({
+    ...q,
+    id: crypto.randomUUID(),
+  }));
+  await db.suggestedQuestions.bulkAdd(newQuestions);
+  return newQuestions;
+}
+
+export async function getSuggestedQuestionsByCase(caseId: string): Promise<SuggestedQuestion[]> {
+  return db.suggestedQuestions
+    .where("caseId")
+    .equals(caseId)
+    .reverse()
+    .sortBy("priority");
+}
+
+export async function getSuggestedQuestionsByTheme(themeId: string): Promise<SuggestedQuestion[]> {
+  return db.suggestedQuestions.where("themeId").equals(themeId).toArray();
+}
+
+export async function deleteSuggestedQuestionsByCase(caseId: string): Promise<void> {
+  await db.suggestedQuestions.where("caseId").equals(caseId).delete();
+}
+
+// Helper to save themes and questions together (replaces existing)
+export async function saveThemesAndQuestions(
+  caseId: string,
+  themes: Omit<CaseTheme, "id">[],
+  questions: Omit<SuggestedQuestion, "id">[]
+): Promise<{ themes: CaseTheme[]; questions: SuggestedQuestion[] }> {
+  return db.transaction("rw", [db.caseThemes, db.suggestedQuestions], async () => {
+    // Delete existing
+    await db.suggestedQuestions.where("caseId").equals(caseId).delete();
+    await db.caseThemes.where("caseId").equals(caseId).delete();
+
+    // Add new
+    const savedThemes = await createCaseThemes(themes);
+    const savedQuestions = await createSuggestedQuestions(questions);
+
+    return { themes: savedThemes, questions: savedQuestions };
+  });
 }

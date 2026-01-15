@@ -8,6 +8,8 @@ import { CaseNav } from "@/components/layout/case-nav";
 import { useCases, useCurrentCase } from "@/lib/contexts/case-context";
 import { getSearchHistoryByCase } from "@/lib/storage/discovery-db";
 import { Button } from "@/components/ui/button";
+import { ThemesSection } from "@/components/themes/themes-section";
+import { useThemes } from "@/lib/hooks/use-themes";
 import {
   FileText,
   MagnifyingGlass,
@@ -25,6 +27,16 @@ export default function CaseOverviewPage() {
   const { selectCase } = useCases();
   const { currentCase } = useCurrentCase();
   const [searchHistory, setSearchHistory] = useState<SearchHistory[]>([]);
+
+  // Theme analysis hook
+  const {
+    themes,
+    suggestedQuestions,
+    isAnalyzing,
+    shouldRefresh,
+    triggerAnalysis,
+    error: themeError,
+  } = useThemes(caseId, currentCase?.name || "", currentCase?.description);
 
   useEffect(() => {
     selectCase(caseId);
@@ -101,6 +113,18 @@ export default function CaseOverviewPage() {
               </div>
             )}
           </div>
+
+          {/* Discovery Insights / Themes */}
+          <ThemesSection
+            themes={themes}
+            suggestedQuestions={suggestedQuestions}
+            caseId={caseId}
+            isAnalyzing={isAnalyzing}
+            shouldRefresh={shouldRefresh}
+            onRefresh={triggerAnalysis}
+            hasDocuments={currentCase.completedCount > 0}
+            error={themeError}
+          />
 
           {/* Primary Actions */}
           <section className="space-y-4">

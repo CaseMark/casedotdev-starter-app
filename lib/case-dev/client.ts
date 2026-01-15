@@ -29,6 +29,28 @@ interface EmbeddingResponse {
   tokensUsed: number;
 }
 
+interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface ChatCompletionResponse {
+  id: string;
+  choices: Array<{
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
 class CaseDevClient {
   private apiKey: string;
   private baseUrl: string;
@@ -236,6 +258,43 @@ class CaseDevClient {
     throw new Error("Unexpected embedding API response format");
   }
 
+  /**
+   * Create a chat completion using the LLM API
+   */
+  async createChatCompletion(
+    messages: ChatMessage[],
+    options: {
+      model?: string;
+      temperature?: number;
+      max_tokens?: number;
+    } = {}
+  ): Promise<ChatCompletionResponse> {
+    const {
+      model = "anthropic/claude-3-5-sonnet-20241022",
+      temperature = 0.7,
+      max_tokens = 2000,
+    } = options;
+
+    // If no API key, return mock response
+    if (!this.apiKey) {
+      return this.mockChatCompletion(messages);
+    }
+
+    console.log("[CaseDev] Creating chat completion with model:", model);
+
+    const response = await this.request<ChatCompletionResponse>("/llm/v1/chat/completions", {
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens,
+      }),
+    });
+
+    return response;
+  }
+
   // ============================================================================
   // Mock/Local implementations for development without API key
   // ============================================================================
@@ -268,6 +327,75 @@ All terms shall be interpreted according to applicable law. Any disputes arising
 Section 3: Conclusion
 This agreement is effective as of the date signed below by both parties.`,
       pageCount: 1,
+    };
+  }
+
+  private mockChatCompletion(messages: ChatMessage[]): ChatCompletionResponse {
+    // Generate mock themes and questions for development without API key
+    const mockContent = JSON.stringify({
+      themes: [
+        {
+          title: "Contract Dispute",
+          description: "Central disagreement over contract terms and obligations between parties.",
+          relevanceScore: 0.92,
+          keyTerms: ["breach", "damages", "obligations", "performance"]
+        },
+        {
+          title: "Timeline of Events",
+          description: "Key dates and sequence of events leading to the dispute.",
+          relevanceScore: 0.85,
+          keyTerms: ["filing date", "notice", "deadline", "execution"]
+        },
+        {
+          title: "Parties and Relationships",
+          description: "Key individuals and organizations involved in the matter.",
+          relevanceScore: 0.78,
+          keyTerms: ["plaintiff", "defendant", "counsel", "witness"]
+        }
+      ],
+      suggestedQuestions: [
+        {
+          question: "What were the specific contract terms that were allegedly breached?",
+          themeTitle: "Contract Dispute",
+          rationale: "Understanding the exact terms in dispute is fundamental to the case.",
+          priority: 5
+        },
+        {
+          question: "What communications occurred between the parties before the dispute?",
+          themeTitle: "Timeline of Events",
+          rationale: "Pre-dispute communications often reveal intent and expectations.",
+          priority: 4
+        },
+        {
+          question: "Who are the key decision-makers mentioned in the documents?",
+          themeTitle: "Parties and Relationships",
+          rationale: "Identifying decision-makers helps focus discovery efforts.",
+          priority: 4
+        },
+        {
+          question: "What damages are being claimed and how are they calculated?",
+          themeTitle: "Contract Dispute",
+          rationale: "Understanding damage claims is essential for case valuation.",
+          priority: 5
+        }
+      ]
+    });
+
+    return {
+      id: `mock-chat-${Date.now()}`,
+      choices: [{
+        message: {
+          role: "assistant",
+          content: mockContent
+        },
+        finish_reason: "stop"
+      }],
+      model: "mock-model",
+      usage: {
+        prompt_tokens: messages.reduce((sum, m) => sum + m.content.length / 4, 0),
+        completion_tokens: mockContent.length / 4,
+        total_tokens: messages.reduce((sum, m) => sum + m.content.length / 4, 0) + mockContent.length / 4
+      }
     };
   }
 
