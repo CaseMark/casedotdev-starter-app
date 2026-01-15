@@ -1,39 +1,94 @@
-# Create Legal App
+# Discovery Desktop
 
-**The Agent-Optimized Legal Tech Starter Kit.**
+**AI-Powered Document Discovery for Legal Professionals**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Next.js](https://img.shields.io/badge/Next.js-15.1-black)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-16.1-black)](https://nextjs.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8)](https://tailwindcss.com)
 
-> 🤖 **Built for Agents**: This repository is designed to be read by AI agents. It includes comprehensive internal documentation (`AGENTS.md` and `skills/`) that guides LLMs in generating production-ready legal tech code.
+## Overview
 
-## 🚀 Overview
+Discovery Desktop is a browser-based document discovery application that enables legal professionals to upload, process, and semantically search through case documents. Built on the Case.dev platform, it provides OCR processing, vector embeddings, and intelligent search capabilities—all running locally in your browser.
 
-`create-legal-app` is a modern, opinionated starter kit for building legal technology applications. It provides a solid foundation with Next.js 15, Shadcn UI (Maia theme), and a structure pre-configured for complex legal workflows like document analysis, case management, and secure vaults.
+## Features
 
-**What makes this different?**
-Most starter kits are just code. This kit includes **Instructional Metadata** (Skills) that teach your AI coding assistant (Cursor, Windsurf, etc.) *exactly* how to implement semantic search, OCR pipelines, and legal-specific workflows using the Case.dev SDK.
+- **Document Upload & OCR**: Upload PDFs and images for automatic text extraction via Case.dev's OCR API
+- **Semantic Search**: Find relevant document passages using AI-powered vector similarity search
+- **Case Management**: Organize documents into cases for structured discovery workflows
+- **Search History**: Track and revisit previous searches within each case
+- **Percentage Match Filtering**: Filter search results by relevance threshold
+- **Local-First Architecture**: All case data stored in your browser for privacy
 
-## ✨ Features & Stack
+## Technology Stack
 
-- **Framework**: [Next.js 15](https://nextjs.org) (App Router)
+- **Framework**: [Next.js 16](https://nextjs.org) (App Router)
 - **Language**: TypeScript
-- **Styling**: [Tailwind CSS 4](https://tailwindcss.com) + [Shadcn UI](https://ui.shadcn.com) (Maia Preset)
-- **Font**: [Inter](https://rsms.me/inter/) & [Spectral](https://fonts.google.com/specimen/Spectral) (Serif for legal texts)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com) with custom legal-focused theme
+- **Typography**: [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) (headings), [Inter](https://rsms.me/inter/) (body)
+- **Database**: IndexedDB via [Dexie.js](https://dexie.org) (client-side)
+- **AI Services**: [Case.dev](https://case.dev) APIs for OCR and embeddings
 - **Package Manager**: [Bun](https://bun.sh)
-- **Agent Skill System**: Dedicated documentation in `skills/` for:
-    - `case-dev`: Legal AI, Vaults, OCR
-    - `database`: Neon / Postgres schemas (Schema ready)
-    - `auth`: Authentication patterns
 
-## 🛠️ Getting Started
+## Database Configuration
 
-### 1. Initialize the Project
+Discovery Desktop uses **IndexedDB** for all client-side data storage, managed through Dexie.js. This provides:
+
+- **Zero server database setup**: No PostgreSQL, MySQL, or cloud database required
+- **Privacy by default**: All case data remains in your browser
+- **Offline capability**: Access your cases without internet (search requires API)
+- **Automatic schema migrations**: Dexie handles database versioning
+
+### Database Schema
+
+| Table | Description |
+|-------|-------------|
+| `cases` | Case metadata (name, description, created date) |
+| `documents` | Uploaded documents with OCR status and extracted text |
+| `chunks` | Text chunks created from documents for embedding |
+| `embeddings` | Vector embeddings for semantic search |
+| `searchHistory` | Previous search queries per case |
+| `processingJobs` | OCR and embedding job status tracking |
+
+## API Pricing
+
+Discovery Desktop uses Case.dev APIs with the following pricing structure:
+
+| Service | Cost |
+|---------|------|
+| **Embedding Generation** | $3.00 per 1M input tokens |
+| **Embedding Generation** | $15.00 per 1M output tokens |
+| **OCR Processing** | $0.02 per page |
+
+### Cost Examples
+
+- Uploading a 10-page PDF: ~$0.20 (OCR) + ~$0.01 (embeddings) = **~$0.21**
+- Running a search query: ~$0.001 per search
+- Processing 100 pages of documents: **~$2.10**
+
+## Demo Limits
+
+This demo application includes usage limits to ensure fair access:
+
+| Limit | Value |
+|-------|-------|
+| **Session Duration** | 24 hours |
+| **Usage Budget** | $5.00 USD |
+
+Once you reach either limit, you'll need to create a free account at [console.case.dev](https://console.case.dev) for unlimited access to Discovery Desktop and other Case.dev applications.
+
+### What counts toward usage?
+
+- OCR processing (per page)
+- Embedding generation for document indexing
+- Embedding generation for search queries
+
+## Getting Started
+
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/CaseMark/create-legal-app.git my-legal-startup
-cd my-legal-startup
+git clone https://github.com/CaseMark/starter-app-demos.git
+cd starter-app-demos/discovery-desktop-demo
 bun install
 ```
 
@@ -45,12 +100,16 @@ Copy the example environment file:
 cp .env.example .env.local
 ```
 
-Fill in your API keys (get your Case.dev keys from the [Case.dev Console](https://console.case.dev)):
+Configure your environment variables:
 
 ```env
-# .env.local
+# Case.dev API (get keys from https://console.case.dev)
 CASE_API_KEY=sk_case_...
-DATABASE_URL=postgres://...
+CASE_API_URL=https://api.case.dev
+
+# Demo limits (optional, defaults shown)
+NEXT_PUBLIC_DEMO_SESSION_HOURS=24
+NEXT_PUBLIC_DEMO_SESSION_PRICE_LIMIT=5
 ```
 
 ### 3. Run Development Server
@@ -59,26 +118,59 @@ DATABASE_URL=postgres://...
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see the starter page.
+Open [http://localhost:3000](http://localhost:3000) to access Discovery Desktop.
 
-## 🤖 For AI Agents
+## Project Structure
 
-**Are you an AI?** Start by reading **[AGENTS.md](./AGENTS.md)**.
+```
+discovery-desktop-demo/
+├── app/                    # Next.js App Router
+│   ├── (protected)/        # Authenticated routes
+│   │   ├── cases/          # Case management pages
+│   │   ├── dashboard/      # Main dashboard
+│   │   └── settings/       # User settings
+│   └── api/                # API routes
+│       ├── embeddings/     # Embedding generation
+│       └── ocr/            # OCR processing
+├── components/
+│   ├── demo/               # Demo limit components
+│   ├── documents/          # Document management UI
+│   ├── layout/             # App layout components
+│   ├── search/             # Search interface
+│   └── ui/                 # Base UI primitives
+├── lib/
+│   ├── case-dev/           # Case.dev API client
+│   ├── contexts/           # React contexts
+│   ├── hooks/              # Custom React hooks
+│   ├── processing/         # Document processing pipeline
+│   ├── search/             # Search implementation
+│   ├── storage/            # IndexedDB operations
+│   ├── usage/              # Demo usage tracking
+│   └── vector-store/       # Vector similarity search
+└── types/                  # TypeScript definitions
+```
 
-1.  **Context**: Read `AGENTS.md` to understand the project architecture and principles.
-2.  **Skills**: Before implementing a feature, check the `skills/` directory. For example, if the user asks for "Document Upload", read `skills/case-dev/SKILL.md`.
-3.  **Conventions**: stricta file naming and `kebab-case` for utilities.
+## Usage Workflow
 
-## 📚 Documentation Structure
+1. **Create a Case**: Start by creating a new case to organize your documents
+2. **Upload Documents**: Add PDFs or images to your case for processing
+3. **Wait for Processing**: Documents are OCR'd and indexed automatically
+4. **Search**: Use natural language queries to find relevant passages
+5. **Review Results**: Click on matches to see full context and source documents
 
-- **`/app`**: Next.js App Router (Pages, Layouts, API Routes)
-- **`/components`**: React components (UI primitives in `/ui`, custom in root)
-- **`/lib`**: Shared utilities (Place your `case-dev` client here)
-- **`/skills`**: **The Brain**. Contains Markdown files specifically for AI context.
-    - `/case-dev`: SDK usage, Vaults, Workflows
-    - `/database`: Schema design patterns
-    - `/auth`: Auth flow documentation
+## Upgrade to Full Access
 
-## 📄 License
+Ready for unlimited document processing? Create a free account at [console.case.dev](https://console.case.dev) to:
+
+- Remove demo usage limits
+- Access additional Case.dev APIs
+- Deploy your own Discovery Desktop instance
+- Build custom legal AI applications
+
+## License
 
 This project is licensed under the [Apache 2.0 License](LICENSE).
+
+---
+
+Built with [Case.dev](https://case.dev) — AI infrastructure for legal technology.
