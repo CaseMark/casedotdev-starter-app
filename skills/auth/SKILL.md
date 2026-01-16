@@ -1213,6 +1213,7 @@ export default async function ProtectedLayout({
 
 ```typescript
 // middleware.ts
+import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -1232,7 +1233,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Check for session cookie
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
     const loginUrl = new URL("/login", request.url);

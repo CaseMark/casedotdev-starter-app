@@ -22,6 +22,7 @@
  * @see skills/auth/SKILL.md for detailed documentation
  */
 
+import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -127,7 +128,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Check for Better Auth session cookie
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  const sessionCookie = getSessionCookie(request);
 
   if (!sessionCookie) {
     // No session - redirect to login
