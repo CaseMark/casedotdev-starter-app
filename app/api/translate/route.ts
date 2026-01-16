@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    let { text, sourceLanguage } = body;
+    const { text } = body;
+    let { sourceLanguage } = body;
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'No text provided' }, { status: 400 });

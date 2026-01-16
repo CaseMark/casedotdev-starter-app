@@ -297,8 +297,8 @@ export default function Home() {
                       Multi-Language Document Processor
                     </h2>
                     <p className="text-gray-600 max-w-lg mx-auto">
-                      Upload documents in 100+ languages including Chinese, Arabic, Japanese, Korean, and more.
-                      We&apos;ll automatically detect the language, extract text with OCR, translate to English,
+                      Upload documents or images in 100+ languages including Chinese, Arabic, Japanese, Korean, and more.
+                      We&apos;ll automatically detect the language, scan images with OCR, translate to English,
                       and make everything searchable.
                     </p>
                   </div>
@@ -330,9 +330,9 @@ export default function Home() {
                       <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
                         <Translate className="w-6 h-6 text-orange-600" weight="bold" />
                       </div>
-                      <h3 className="font-semibold text-gray-800 mb-2">Side-by-Side View</h3>
+                      <h3 className="font-semibold text-gray-800 mb-2">Image Scanning & Translation</h3>
                       <p className="text-sm text-gray-600">
-                        View original and translated text side by side with synchronized scrolling.
+                        Upload photos of documents and we&apos;ll extract the text with OCR and translate it automatically. Supports Latin-alphabet languages.
                       </p>
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-gray-200">

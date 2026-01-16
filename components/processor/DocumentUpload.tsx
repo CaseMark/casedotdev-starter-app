@@ -1,13 +1,20 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, Spinner, CheckCircle, WarningCircle, Globe } from '@phosphor-icons/react';
+import { Upload, FileText, Image as ImageIcon, Spinner, CheckCircle, WarningCircle, Globe } from '@phosphor-icons/react';
 import { SUPPORTED_LANGUAGES, LanguageCode, ProcessingStatus } from '@/lib/types';
 import { DEMO_LIMITS } from '@/lib/demo-limits/config';
 import { UsageMeter } from '@/components/demo/UsageMeter';
 import { LimitWarning } from '@/components/demo/LimitWarning';
 import { processDocument } from '@/lib/document-processor';
 import { loadUsage } from '@/lib/storage/document-storage';
+
+// Image file types supported for OCR
+const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/tiff'];
+
+// OCR polling configuration
+const OCR_POLL_INTERVAL = 3000; // 3 seconds
+const OCR_MAX_POLLS = 60; // Max 3 minutes of polling
 
 interface DocumentUploadProps {
   onDocumentProcessed: (document: {
@@ -79,11 +86,14 @@ export default function DocumentUpload({
       return;
     }
 
-    // Validate file type - only PDF, RTF, and TXT (no images)
-    const validTypes = ['application/pdf', 'text/plain', 'application/rtf', 'text/rtf'];
+    // Validate file type - PDF, RTF, TXT, and images
+    const validDocTypes = ['application/pdf', 'text/plain', 'application/rtf', 'text/rtf'];
     const fileName = file.name.toLowerCase();
-    if (!validTypes.includes(file.type) && !fileName.endsWith('.rtf')) {
-      setError('Please upload a PDF, RTF, or text file. Image files are not supported in this demo.');
+    const isImage = IMAGE_MIME_TYPES.includes(file.type);
+    const isDocument = validDocTypes.includes(file.type) || fileName.endsWith('.rtf');
+
+    if (!isImage && !isDocument) {
+      setError('Please upload a PDF, RTF, text file, or image (PNG, JPEG, GIF, WebP, TIFF).');
       return;
     }
 
@@ -101,23 +111,112 @@ export default function DocumentUpload({
 
     try {
       // ========================================
-      // STEP 1: Extract text from document (client-side)
+      // STEP 1: Extract text from document
       // ========================================
-      setStatus('uploading');
-      setProgress(10);
+      let extractedText: string;
+      let pageCount: number;
+      let ocrCost = 0; // Track OCR cost separately
 
-      console.log(`[Upload] Processing ${file.name} (${file.type})`);
-      const extraction = await processDocument(file);
+      // Check if this is an image file that needs OCR
+      if (IMAGE_MIME_TYPES.includes(file.type)) {
+        // ========================================
+        // IMAGE OCR PATH
+        // ========================================
+        setStatus('ocr_processing');
+        setProgress(10);
 
-      if (!extraction.text || extraction.text.trim().length === 0) {
-        throw new Error('Could not extract text from this document. Please ensure the PDF contains selectable text (not a scanned image).');
+        console.log(`[Upload] Processing image with OCR: ${file.name} (${file.type})`);
+
+        // Submit image for OCR
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('documentId', generateId());
+
+        const submitResponse = await fetch('/api/ocr/submit', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!submitResponse.ok) {
+          const errorData = await submitResponse.json();
+          throw new Error(errorData.error || 'Failed to submit image for OCR');
+        }
+
+        const submitResult = await submitResponse.json();
+        const { statusUrl, textUrl, blobUrl } = submitResult;
+
+        console.log(`[Upload] OCR job submitted: ${submitResult.jobId}`);
+        setProgress(20);
+
+        // Poll for OCR completion
+        let pollCount = 0;
+        let ocrText: string | undefined;
+        let ocrPageCount = 1;
+
+        while (pollCount < OCR_MAX_POLLS) {
+          pollCount++;
+          console.log(`[Upload] Polling OCR status (${pollCount}/${OCR_MAX_POLLS})...`);
+
+          const statusResponse = await fetch(
+            `/api/ocr/status?statusUrl=${encodeURIComponent(statusUrl)}&textUrl=${encodeURIComponent(textUrl)}${blobUrl ? `&blobUrl=${encodeURIComponent(blobUrl)}` : ''}`
+          );
+
+          if (!statusResponse.ok) {
+            const errorData = await statusResponse.json();
+            throw new Error(errorData.error || 'Failed to check OCR status');
+          }
+
+          const statusResult = await statusResponse.json();
+          console.log(`[Upload] OCR status: ${statusResult.status}`);
+
+          if (statusResult.status === 'completed') {
+            ocrText = statusResult.text;
+            ocrPageCount = statusResult.pageCount || 1;
+            ocrCost = statusResult.ocrCost || 0;
+            console.log(`[Upload] OCR completed: ${ocrText?.length || 0} chars extracted, cost: $${ocrCost.toFixed(4)}`);
+            break;
+          }
+
+          if (statusResult.status === 'failed') {
+            throw new Error(statusResult.error || 'OCR processing failed');
+          }
+
+          // Update progress during polling (20-50%)
+          const pollProgress = 20 + Math.min(30, pollCount * 2);
+          setProgress(pollProgress);
+
+          // Wait before next poll
+          await new Promise(resolve => setTimeout(resolve, OCR_POLL_INTERVAL));
+        }
+
+        if (!ocrText || ocrText.trim().length === 0) {
+          throw new Error('Could not extract text from this image. Please ensure the image contains readable text.');
+        }
+
+        extractedText = ocrText;
+        pageCount = ocrPageCount;
+        setProgress(50);
+
+      } else {
+        // ========================================
+        // DOCUMENT PATH (PDF, RTF, TXT)
+        // ========================================
+        setStatus('uploading');
+        setProgress(10);
+
+        console.log(`[Upload] Processing document: ${file.name} (${file.type})`);
+        const extraction = await processDocument(file);
+
+        if (!extraction.text || extraction.text.trim().length === 0) {
+          throw new Error('Could not extract text from this document. Please ensure the PDF contains selectable text (not a scanned image).');
+        }
+
+        extractedText = extraction.text;
+        pageCount = extraction.pageCount;
+        setProgress(20);
       }
 
-      const extractedText = extraction.text;
-      const pageCount = extraction.pageCount;
-
       console.log(`[Upload] Extracted ${extractedText.length} chars from ${pageCount} pages`);
-      setProgress(20);
 
       // ========================================
       // STEP 2: Detect language
@@ -193,9 +292,13 @@ export default function DocumentUpload({
       setProgress(95);
 
       // ========================================
-      // STEP 5: Finalize
+      // STEP 4: Finalize
       // ========================================
       setStatus('indexing');
+
+      // Calculate total cost (OCR + Translation)
+      const totalCost = ocrCost + translationCost;
+      console.log(`[Upload] Total cost: $${totalCost.toFixed(4)} (OCR: $${ocrCost.toFixed(4)}, Translation: $${translationCost.toFixed(4)})`);
 
       // Complete!
       setStatus('completed');
@@ -208,7 +311,7 @@ export default function DocumentUpload({
         originalText: extractedText,
         translatedText: translatedText,
         pageCount: pageCount,
-        cost: translationCost,
+        cost: totalCost,
       });
 
       // Reset after a moment
@@ -315,7 +418,7 @@ export default function DocumentUpload({
           id="file-input"
           type="file"
           className="hidden"
-          accept=".pdf,.txt,.rtf"
+          accept=".pdf,.txt,.rtf,.png,.jpg,.jpeg,.gif,.webp,.tiff"
           onChange={handleFileInput}
           disabled={isProcessing}
         />
@@ -351,7 +454,7 @@ export default function DocumentUpload({
 
             {!isProcessing && status === 'idle' && (
               <p className="text-sm text-gray-500 mt-1">
-                Drag and drop a PDF, RTF, or text file, or click to browse
+                Drag and drop a PDF, RTF, text file, or image, or click to browse
               </p>
             )}
 
@@ -423,13 +526,21 @@ export default function DocumentUpload({
       </div>
 
       {/* File Types */}
-      <div className="mt-4 flex justify-center gap-4 text-xs text-gray-400">
-        <span className="flex items-center gap-1">
-          <FileText className="w-3 h-3" /> PDF
-        </span>
-        <span className="flex items-center gap-1">
-          <FileText className="w-3 h-3" /> TXT
-        </span>
+      <div className="mt-4 flex flex-col items-center gap-2">
+        <div className="flex justify-center gap-4 text-xs text-gray-400">
+          <span className="flex items-center gap-1">
+            <FileText className="w-3 h-3" /> PDF
+          </span>
+          <span className="flex items-center gap-1">
+            <FileText className="w-3 h-3" /> TXT
+          </span>
+          <span className="flex items-center gap-1">
+            <ImageIcon className="w-3 h-3" /> Images (OCR)
+          </span>
+        </div>
+        <p className="text-xs text-gray-400">
+          Image OCR supports Latin-alphabet languages only
+        </p>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@
 export interface ExtractionResult {
   text: string;
   pageCount: number;
-  method: 'pdf-text' | 'plain-text' | 'rtf-text';
+  method: 'pdf-text' | 'plain-text' | 'rtf-text' | 'ocr';
 }
 
 // Dynamically load PDF.js
