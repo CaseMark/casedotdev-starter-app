@@ -251,15 +251,18 @@ export async function POST(request: NextRequest) {
       } catch (ocrError) {
         console.error('[Extract] OCR failed:', ocrError);
         // OCR failed, but we continue with empty text
-      } finally {
-        // Clean up uploaded blob if we created one
-        if (blobUrl && blobToken) {
-          try {
-            await del(blobUrl, { token: blobToken });
-            console.log('[Extract] Cleaned up blob');
-          } catch {
-            // Ignore cleanup errors
-          }
+      }
+
+      // CRITICAL: Always clean up blob - user images must NEVER stay on blob permanently
+      // This runs regardless of OCR success/failure
+      if (blobUrl && blobToken) {
+        try {
+          await del(blobUrl, { token: blobToken });
+          console.log('[Extract] Blob deleted - user image removed from cloud storage');
+        } catch (cleanupError) {
+          // Log prominently - manual cleanup may be needed
+          console.error('[Extract] PRIVACY WARNING: Failed to delete blob:', cleanupError);
+          console.error('[Extract] Manual cleanup needed for:', blobUrl);
         }
       }
     }
