@@ -62,6 +62,8 @@ export const authClient = createAuthClient({
  * Usage in components:
  * import { useSession, signIn, signOut } from "@/lib/auth/client";
  */
+type SignOutFn = typeof authClient.signOut;
+
 export const {
   // Session
   useSession,
@@ -69,7 +71,7 @@ export const {
   // Authentication
   signIn,
   signUp,
-  signOut,
+  signOut: baseSignOut,
 
   // Organization (when using org plugin)
   useActiveOrganization,
@@ -78,6 +80,15 @@ export const {
   // Two-Factor (when using 2FA plugin)
   twoFactor,
 } = authClient;
+
+export const signOut: SignOutFn = async (...args) => {
+  const result = await baseSignOut(...args);
+  authClient.$store.notify("$sessionSignal");
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+  return result;
+};
 
 /**
  * Organization methods (namespaced)
