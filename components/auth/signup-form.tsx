@@ -24,7 +24,7 @@ interface SignupFormProps {
  * @example
  * <SignupForm callbackUrl="/onboarding" />
  */
-export function SignupForm({ callbackUrl = "/dashboard", className }: SignupFormProps) {
+export function SignupForm({ callbackUrl = "/", className }: SignupFormProps) {
   const router = useRouter();
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
