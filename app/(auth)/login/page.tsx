@@ -15,12 +15,20 @@ import { LoginForm } from "@/components/auth/login-form";
  *
  * @see skills/auth/SKILL.md for customization options
  */
+function getSafeCallbackUrl(value?: string) {
+  if (!value) return "/";
+  if (!value.startsWith("/")) return "/";
+  if (value.startsWith("//")) return "/";
+  return value;
+}
+
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
   const { callbackUrl } = await searchParams;
+  const safeCallbackUrl = getSafeCallbackUrl(callbackUrl);
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -30,7 +38,7 @@ export default async function LoginPage({
         </p>
       </div>
 
-      <LoginForm callbackUrl={callbackUrl || "/"} />
+      <LoginForm callbackUrl={safeCallbackUrl} />
 
       {/* OAuth providers can be added here for OAuth-enabled templates */}
       {/* Example:
