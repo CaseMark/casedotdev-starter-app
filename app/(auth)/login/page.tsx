@@ -15,17 +15,19 @@ import { LoginForm } from "@/components/auth/login-form";
  *
  * @see skills/auth/SKILL.md for customization options
  */
-function getSafeCallbackUrl(value?: string) {
+function getSafeCallbackUrl(value?: string | string[]) {
   if (!value) return "/";
-  if (!value.startsWith("/")) return "/";
-  if (value.startsWith("//")) return "/";
-  return value;
+  const resolved = Array.isArray(value) ? value[0] : value;
+  if (!resolved) return "/";
+  if (!resolved.startsWith("/")) return "/";
+  if (resolved.startsWith("//")) return "/";
+  return resolved;
 }
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
 }) {
   const { callbackUrl } = await searchParams;
   const safeCallbackUrl = getSafeCallbackUrl(callbackUrl);
