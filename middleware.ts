@@ -38,7 +38,7 @@ import type { NextRequest } from "next/server";
  * - "public-by-default": Only protect routes in `protectedRoutes`
  * - "private-by-default": Protect everything except `publicRoutes`
  */
-const AUTH_MODE: "disabled" | "public-by-default" | "private-by-default" = "public-by-default";
+const AUTH_MODE: "disabled" | "public-by-default" | "private-by-default" = "disabled";
 
 /**
  * Routes that require authentication (used in "public-by-default" mode)
@@ -49,6 +49,16 @@ const protectedRoutes = [
   "/settings",
   "/account",
   "/admin",
+];
+
+/**
+ * Bankruptcy routes that require case.dev API key to be connected
+ * Users will be redirected to settings if they try to access without connection
+ */
+const bankruptcyRoutes = [
+  "/cases",
+  "/intake",
+  "/forms",
 ];
 
 /**
@@ -98,7 +108,11 @@ function isAlwaysPublicRoute(pathname: string): boolean {
   return matchesRoute(pathname, alwaysPublicRoutes);
 }
 
-export function middleware(request: NextRequest) {
+function isBankruptcyRoute(pathname: string): boolean {
+  return matchesRoute(pathname, bankruptcyRoutes);
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow certain routes regardless of auth mode
@@ -135,6 +149,60 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Session exists - check if bankruptcy route requires case.dev connection
+  if (isBankruptcyRoute(pathname)) {
+    try {
+      // Check if user has case.dev connected
+      const statusResponse = await fetch(
+        new URL('/api/case-dev/status', request.url),
+        {
+          headers: {
+            cookie: request.headers.get('cookie') || '',
+          },
+        }
+      );
+
+      if (statusResponse.ok) {
+        const status = await statusResponse.json();
+
+        if (!status.connected) {
+          // Not connected - redirect to settings with required flag
+          const settingsUrl = new URL('/settings/case-dev', request.url);
+          settingsUrl.searchParams.set('required', 'true');
+          settingsUrl.searchParams.set('returnTo', pathname);
+          return NextResponse.redirect(settingsUrl);
+        }
+
+        // Check if database is provisioned
+        const dbStatusResponse = await fetch(
+          new URL('/api/provision-database', request.url),
+          {
+            method: 'GET',
+            headers: {
+              cookie: request.headers.get('cookie') || '',
+            },
+          }
+        );
+
+        if (dbStatusResponse.ok) {
+          const dbStatus = await dbStatusResponse.json();
+
+          if (!dbStatus.provisioned) {
+            // Database not provisioned - redirect to settings with message
+            const settingsUrl = new URL('/settings/case-dev', request.url);
+            settingsUrl.searchParams.set('dbRequired', 'true');
+            settingsUrl.searchParams.set('returnTo', pathname);
+            return NextResponse.redirect(settingsUrl);
+          }
+        }
+      }
+    } catch (error) {
+      // If check fails, log but allow through
+      // Actual API endpoints will handle auth properly
+      console.error('[middleware] Failed to check case.dev status:', error);
+    }
   }
 
   // Session exists - allow access
