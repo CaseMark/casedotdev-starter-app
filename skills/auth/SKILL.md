@@ -411,8 +411,12 @@ This automatically creates the required tables in your database.
 
 First, create the auth schema file:
 
+**Critical naming rule:** Better Auth expects **camelCase property names** in your schema (e.g., `emailVerified`, `createdAt`) mapped to **snake_case DB columns** (e.g., `email_verified`, `created_at`).
+Never use snake_case property names like `email_verified` or `created_at` in the schema.
+
 ```typescript
 // lib/db/schema/auth.ts
+// camelCase property names + snake_case column names (required by Better Auth)
 import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {

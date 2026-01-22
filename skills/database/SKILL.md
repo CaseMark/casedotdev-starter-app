@@ -74,6 +74,9 @@ export const db = drizzle(sql, { schema });
 
 ## Schema Definition
 
+**Naming convention:** use **camelCase property names** mapped to **snake_case DB columns**. Example: `createdAt: timestamp("created_at")`.
+For Better Auth tables specifically, always copy the templates from `lib/auth/templates/` and keep the property names camelCase.
+
 ### Basic Table
 
 ```typescript
