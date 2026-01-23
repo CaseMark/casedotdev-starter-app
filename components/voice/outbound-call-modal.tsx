@@ -78,21 +78,30 @@ export function OutboundCallModal({
     setApiError(null);
 
     try {
+      // Get database connection from localStorage
+      const connectionString = localStorage.getItem('bankruptcy_db_connection');
+      if (!connectionString) {
+        throw new Error('Database connection not found. Please refresh the page.');
+      }
+
       // Format phone to E.164 format
       const formattedPhone = formatToE164(phoneNumber);
 
       // Call API to initiate outbound call
-      const response = await fetch("/api/vapi/outbound", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          caseId,
-          phoneNumber: formattedPhone,
-          clientName,
-        }),
-      });
+      const response = await fetch(
+        `/api/vapi/outbound?connectionString=${encodeURIComponent(connectionString)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            caseId,
+            phoneNumber: formattedPhone,
+            clientName,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -119,7 +128,7 @@ export function OutboundCallModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 text-xl">
             <Phone className="w-5 h-5 text-primary" />
             Schedule Intake Call
           </DialogTitle>

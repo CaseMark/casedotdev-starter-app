@@ -80,6 +80,7 @@ export default function CaseDetailPage() {
   const [showAllMissingDocs, setShowAllMissingDocs] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [outboundModalOpen, setOutboundModalOpen] = useState(false);
+  const [callPlaced, setCallPlaced] = useState(false);
 
   const handleDeleteCase = async () => {
     const connectionString = localStorage.getItem('bankruptcy_db_connection');
@@ -386,8 +387,15 @@ export default function CaseDetailPage() {
           caseId={caseData.id}
           existingPhone={caseData.clientPhone}
           onCallScheduled={() => {
-            // Optionally refresh case data after call is scheduled
-            fetchCaseData();
+            // Show success notification
+            setCallPlaced(true);
+            setTimeout(() => setCallPlaced(false), 3000);
+
+            // Refresh case data after call is scheduled
+            const connectionString = localStorage.getItem('bankruptcy_db_connection');
+            if (connectionString) {
+              fetchCaseData(connectionString);
+            }
           }}
         />
       )}
@@ -396,9 +404,9 @@ export default function CaseDetailPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Case</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl">Delete Case</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the case for <strong>{caseData.clientName}</strong>? 
+              Are you sure you want to delete the case for <strong>{caseData.clientName}</strong>?
               This action cannot be undone and will permanently remove all case data, documents, and forms.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -421,6 +429,14 @@ export default function CaseDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Call Placed Notification */}
+      {callPlaced && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="font-medium">Call placed</span>
+        </div>
+      )}
 
       {/* Case Information Card */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

@@ -104,10 +104,22 @@ export default function CasesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [caseToDelete, setCaseToDelete] = useState<{ id: string; clientName: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [phoneCopied, setPhoneCopied] = useState(false);
+
+  const handleCopyPhone = async () => {
+    const phoneNumber = process.env.NEXT_PUBLIC_VAPI_PHONE_NUMBER || '16282440385';
+    try {
+      await navigator.clipboard.writeText(phoneNumber);
+      setPhoneCopied(true);
+      setTimeout(() => setPhoneCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy phone number:', error);
+    }
+  };
 
   const handleDeleteCase = async () => {
     if (!caseToDelete) return;
-    
+
     setDeleting(true);
     try {
       const connectionString = localStorage.getItem('bankruptcy_db_connection');
@@ -266,17 +278,27 @@ export default function CasesPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Voice Intake Info Box */}
-        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3">
+        <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4 flex items-center gap-3 relative">
           <Phone className="w-5 h-5 text-orange-600 flex-shrink-0" />
           <p className="text-sm text-orange-800">
             Clients can call{' '}
-            <span className="inline-flex items-center mx-1 px-2.5 py-1 bg-white border border-orange-300 rounded-md font-semibold text-orange-900 tracking-wide">
+            <span
+              onClick={handleCopyPhone}
+              className="inline-flex items-center mx-1 px-2.5 py-1 bg-white border border-orange-300 rounded-md font-semibold text-orange-900 tracking-wide cursor-pointer hover:bg-orange-50 hover:border-orange-400 transition-all active:scale-95"
+              title="Click to copy"
+            >
               {process.env.NEXT_PUBLIC_VAPI_PHONE_NUMBER
                 ? formatForDisplay(process.env.NEXT_PUBLIC_VAPI_PHONE_NUMBER)
                 : '+1 (628) 244 0385'}
             </span>
             {' '}and our voice agent will begin the automated intake process.
           </p>
+          {/* Copy confirmation popup */}
+          {phoneCopied && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900 text-white px-4 py-2 rounded-md shadow-lg text-sm font-medium animate-in fade-in zoom-in duration-200">
+              Copied phone number
+            </div>
+          )}
         </div>
 
         {cases.length === 0 ? (
@@ -420,7 +442,7 @@ export default function CasesPage() {
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Case</AlertDialogTitle>
+              <AlertDialogTitle className="text-xl">Delete Case</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to delete the case for <strong>{caseToDelete?.clientName}</strong>?
                 This action cannot be undone and will permanently remove all case data, documents, and forms.

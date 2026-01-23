@@ -136,7 +136,7 @@ export function EditClientModal({ open, onOpenChange, caseData, onSuccess }: Edi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Client Information</DialogTitle>
+          <DialogTitle className="text-xl">Edit Client Information</DialogTitle>
           <DialogDescription>
             Update the client details for this bankruptcy case.
           </DialogDescription>
