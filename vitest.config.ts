@@ -4,6 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
+  // @ts-ignore - vitest test config
   test: {
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
