@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { useVapi } from "@/app/hooks/useVapi";
-import { useSession } from "@/lib/auth/client";
+import { getUserId } from "@/lib/utils/get-user-id";
 
 interface IntakeCallButtonProps {
   className?: string;
@@ -16,7 +16,7 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [connectionString, setConnectionString] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
-  const { data: session } = useSession();
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const {
     startCall,
@@ -37,6 +37,12 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
   useEffect(() => {
     const stored = localStorage.getItem("bankruptcy_db_connection");
     setConnectionString(stored);
+
+    // Get user ID (works with or without auth)
+    // If Better Auth is enabled and user is logged in, we could enhance this
+    // to try fetching from session first, but for now use localStorage-based ID
+    const userId = getUserId();
+    setCurrentUserId(userId);
   }, []);
 
   const handleOpenModal = () => {
@@ -48,10 +54,11 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
     clearError();
 
     // Pass connection string and userId as metadata so webhook can access the database
+    // userId works regardless of whether Better Auth is enabled or disabled
     await startCall({
       metadata: {
         connectionString: connectionString,
-        userId: session?.user?.id || null,
+        userId: currentUserId,
       },
     });
   };
