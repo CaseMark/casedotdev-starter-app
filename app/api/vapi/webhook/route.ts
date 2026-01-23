@@ -8,12 +8,17 @@ import postgres from 'postgres';
  * Configure this URL in your Vapi assistant's "Server URL" setting.
  *
  * Supported functions:
- * - check_existing_case: Check if client has an existing case
+ * - check_existing_case: Check if client has existing case (auto-creates if none exists)
  * - verify_client: Verify client identity with name + SSN
- * - create_new_case: Create a new bankruptcy case
- * - update_case_intake: Update an existing case with intake data
+ * - create_new_case: Create a new bankruptcy case (deprecated - use check_existing_case)
+ * - update_case_intake: Incrementally update case with intake data (call after each field collected)
  * - get_case_documents: Get list of documents uploaded to a case
  * - get_required_documents: Get required documents and their upload status
+ *
+ * DATA PERSISTENCE STRATEGY:
+ * - Cases are created immediately when client provides name (via check_existing_case)
+ * - Each piece of collected info is saved immediately (via update_case_intake)
+ * - This ensures no data loss if call drops prematurely
  */
 
 interface VapiFunctionCall {
@@ -109,11 +114,14 @@ export async function POST(request: NextRequest) {
 /**
  * Check if a client has any existing cases
  * Called at the start of the conversation to determine the flow
+ *
+ * IMPORTANT: If no case exists, this function automatically creates one
+ * to ensure data is saved even if the call drops prematurely.
  */
 async function checkExistingCase(
   sql: postgres.Sql,
   params: Record<string, unknown>
-): Promise<{ hasExistingCase: boolean; message: string }> {
+): Promise<{ hasExistingCase: boolean; caseId?: string; message: string }> {
   const firstName = (params.first_name as string)?.trim().toLowerCase();
   const lastName = (params.last_name as string)?.trim().toLowerCase();
 
@@ -137,13 +145,56 @@ async function checkExistingCase(
   if (cases.length > 0) {
     return {
       hasExistingCase: true,
+      caseId: cases[0].id,
       message: `I found ${cases.length} existing case(s) for ${firstName} ${lastName}. To verify your identity and access your case, I'll need the last 4 digits of your Social Security Number.`,
     };
   }
 
+  // NO EXISTING CASE - Create one immediately to prevent data loss if call drops
+  const fullName = `${firstName.charAt(0).toUpperCase() + firstName.slice(1)} ${lastName.charAt(0).toUpperCase() + lastName.slice(1)}`;
+  const newCaseId = `case_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+  // Ensure table exists
+  await sql`
+    CREATE TABLE IF NOT EXISTS bankruptcy_cases (
+      id TEXT PRIMARY KEY,
+      client_name TEXT NOT NULL,
+      client_email TEXT,
+      client_phone TEXT,
+      ssn_last4 TEXT,
+      address TEXT,
+      city TEXT,
+      state TEXT,
+      zip TEXT,
+      county TEXT,
+      case_type TEXT NOT NULL,
+      filing_type TEXT NOT NULL,
+      household_size INTEGER,
+      status TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  // Create minimal case with just the name
+  await sql`
+    INSERT INTO bankruptcy_cases (
+      id, client_name, case_type, filing_type, status, created_at, updated_at
+    ) VALUES (
+      ${newCaseId},
+      ${fullName},
+      'chapter7',
+      'individual',
+      'intake',
+      NOW(),
+      NOW()
+    )
+  `;
+
   return {
     hasExistingCase: false,
-    message: `I don't see any existing cases for ${firstName} ${lastName}. Let's start a new case for you.`,
+    caseId: newCaseId,
+    message: `I've started a new case for ${fullName}. Let's gather your information.`,
   };
 }
 
@@ -289,6 +340,13 @@ async function createNewCase(
 
 /**
  * Update an existing case with intake information
+ *
+ * INCREMENTAL UPDATES: This function is designed to be called multiple times
+ * during a conversation. The VAPI assistant should call this function after
+ * collecting each piece of information (e.g., after getting email, after getting
+ * address, etc.) to ensure data is saved immediately.
+ *
+ * Only provided fields are updated - existing data is preserved.
  */
 async function updateCaseIntake(
   sql: postgres.Sql,
@@ -317,6 +375,7 @@ async function updateCaseIntake(
   }
 
   // Build dynamic update based on provided fields
+  // Only fields that are provided in params will be updated
   const updates: Record<string, unknown> = {};
 
   if (params.client_email) updates.client_email = params.client_email;

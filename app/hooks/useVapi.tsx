@@ -113,6 +113,11 @@ export const useVapi = (config: VapiConfig) => {
           }));
         }
       }
+
+      // Handle call end events from VAPI
+      if (message.type === 'end-of-call-report' || message.type === 'hang') {
+        console.log('Call ended by assistant or remote party');
+      }
     };
 
     const handleVolumeLevel = (level: number) => {
@@ -171,6 +176,21 @@ export const useVapi = (config: VapiConfig) => {
 
   const sendMessage = useCallback((message: string) => {
     if (!vapiRef.current || !state.isSessionActive) return;
+
+    // Add the message to transcripts immediately so it appears in the chat
+    const newTranscript: TranscriptMessage = {
+      role: 'user',
+      text: message,
+      timestamp: new Date(),
+      isFinal: true,
+    };
+
+    setState(prev => ({
+      ...prev,
+      transcripts: [...prev.transcripts, newTranscript],
+    }));
+
+    // Send to VAPI
     vapiRef.current.send({
       type: 'add-message',
       message: {

@@ -255,7 +255,7 @@ export default function CasesPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl text-foreground">Bankruptcy Cases</h1>
+              <h1 className="text-3xl text-foreground">Bankruptcy Cases</h1>
               <p className="text-sm text-muted-foreground mt-1">Manage your Chapter 7 and Chapter 13 cases</p>
             </div>
             <div className="flex items-center gap-3">
