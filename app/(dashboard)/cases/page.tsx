@@ -490,21 +490,6 @@ export default function CasesPage() {
             </Card>
 
             <Card
-              onClick={() => handleFeatureClick('chapter13Plan')}
-              className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary active:scale-[0.98]"
-            >
-              <CardHeader className="pb-2">
-                <DollarSign className="w-6 h-6 text-primary mb-2" />
-                <CardTitle className="text-base">Chapter 13 Plan</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">
-                  Calculate 3-5 year repayment plans automatically
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card
               onClick={() => handleFeatureClick('paymentTracking')}
               className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-primary active:scale-[0.98]"
             >
@@ -516,6 +501,19 @@ export default function CasesPage() {
                 <p className="text-xs text-muted-foreground">
                   Monitor trustee payments over plan duration
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-amber-500 opacity-75">
+              <CardHeader className="pb-2">
+                <DollarSign className="w-6 h-6 text-amber-600 mb-2" />
+                <CardTitle className="text-base">Chapter 13 Plan</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground">
+                  Calculate 3-5 year repayment plans automatically
+                </p>
+                <span className="text-[10px] bg-accent text-primary px-1.5 py-0.5 rounded mt-2 inline-block">Coming Soon</span>
               </CardContent>
             </Card>
 
