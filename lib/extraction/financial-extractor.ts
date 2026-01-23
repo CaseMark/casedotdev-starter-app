@@ -56,12 +56,14 @@ export interface ExtractedIncome {
 export interface ExtractedDebt {
   creditorName: string;
   accountNumber: string | null;
+  accountLast4: string | null; // Last 4 digits for matching across statements
   debtType: 'credit-card' | 'medical' | 'personal-loan' | 'auto-loan' | 'mortgage' | 'student-loan' | 'tax-debt' | 'other';
   originalAmount: number | null;
   currentBalance: number;
   monthlyPayment: number | null;
   isSecured: boolean;
   collateralDescription: string | null;
+  statementDate: string | null; // YYYY-MM-DD for determining most recent
   source: string;
   confidence: number;
 }
@@ -73,6 +75,9 @@ export interface ExtractedAsset {
   ownershipPercentage: number;
   isExempt: boolean | null;
   encumbrances: number;
+  accountLast4: string | null; // Last 4 digits for bank accounts - used to match across statements
+  institutionName: string | null; // Bank name for matching
+  statementDate: string | null; // YYYY-MM-DD for determining most recent
   source: string;
   confidence: number;
 }
@@ -619,20 +624,24 @@ Return a JSON object with this exact structure:
   "debts": [
     {
       "creditorName": "<string>",
-      "accountNumber": "<string or null>",
+      "accountNumber": "<full account number if visible, or null>",
+      "accountLast4": "<last 4 digits of account number - IMPORTANT for matching>",
       "debtType": "credit-card" | "medical" | "personal-loan" | "auto-loan" | "mortgage" | "student-loan" | "tax-debt" | "other",
       "originalAmount": <number or null>,
       "currentBalance": <number>,
       "monthlyPayment": <number or null>,
       "isSecured": <boolean>,
       "collateralDescription": "<string or null>",
+      "statementDate": "<YYYY-MM-DD format - the statement date or closing date>",
       "confidence": <0-1 score>
     }
   ]
 }
 
-IMPORTANT:
-- Extract the CURRENT BALANCE as the primary amount (statement balance, amount due, payoff amount)
+CRITICAL:
+- Extract accountLast4 (last 4 digits) - this is used to match the same account across multiple statements
+- Extract statementDate - this determines which statement is most recent
+- Extract the CURRENT BALANCE / STATEMENT BALANCE as the primary amount
 - If multiple balances shown, use the total/statement balance
 - Set confidence to 0.9+ for clearly visible amounts
 - Include ONLY the JSON object in your response`;
@@ -641,11 +650,14 @@ IMPORTANT:
   private buildAssetExtractionPrompt(documentType: string): string {
     const typeSpecificInstructions: Record<string, string> = {
       bank_statement: `This is a BANK STATEMENT. Look for:
-- Bank name and account type (checking, savings, money market)
-- Account number (last 4 digits)
+- Bank name (Chase, Wells Fargo, Bank of America, etc.) - IMPORTANT for matching
+- Account number - extract the LAST 4 DIGITS - CRITICAL for matching across statements
+- Account type (checking, savings, money market)
 - ENDING BALANCE or CURRENT BALANCE (use this as the asset value)
-- Statement period dates
-The asset type should be "bank-account". Use the ending/current balance as estimatedValue.`,
+- Statement date or statement period END date - CRITICAL for determining most recent
+
+The asset type should be "bank-account". Use the ending/current balance as estimatedValue.
+IMPORTANT: The accountLast4 and statementDate are CRITICAL for matching the same account across multiple monthly statements.`,
 
       vehicle_title: `This is a VEHICLE TITLE. Look for:
 - Make, Model, Year of vehicle
@@ -686,12 +698,16 @@ Return a JSON object with this exact structure:
       "ownershipPercentage": <number 0-100, default 100>,
       "isExempt": <boolean or null>,
       "encumbrances": <number, default 0>,
+      "accountLast4": "<last 4 digits of account number for bank accounts - CRITICAL>",
+      "institutionName": "<bank or institution name - CRITICAL for matching>",
+      "statementDate": "<YYYY-MM-DD - statement date or period end date - CRITICAL>",
       "confidence": <0-1 score>
     }
   ]
 }
 
-IMPORTANT:
+CRITICAL:
+- For bank accounts: accountLast4, institutionName, and statementDate are REQUIRED for matching across multiple statements
 - For bank accounts, use the ENDING or CURRENT balance as estimatedValue
 - For vehicles, include year/make/model in description
 - For real estate, include the property address in description
@@ -721,18 +737,53 @@ IMPORTANT:
       return [];
     }
 
-    return extracted.debts.map((debt: any) => ({
-      creditorName: debt.creditorName || 'Unknown Creditor',
-      accountNumber: debt.accountNumber || null,
-      debtType: debt.debtType || 'other',
-      originalAmount: debt.originalAmount ? parseFloat(debt.originalAmount) : null,
-      currentBalance: parseFloat(debt.currentBalance) || 0,
-      monthlyPayment: debt.monthlyPayment ? parseFloat(debt.monthlyPayment) : null,
-      isSecured: debt.isSecured || false,
-      collateralDescription: debt.collateralDescription || null,
-      source: 'llm-extraction',
-      confidence: debt.confidence || 0.7,
-    }));
+    return extracted.debts.map((debt: any) => {
+      // Extract last 4 digits from account number if not explicitly provided
+      let accountLast4 = debt.accountLast4 || null;
+      if (!accountLast4 && debt.accountNumber) {
+        const cleaned = debt.accountNumber.replace(/\D/g, '');
+        accountLast4 = cleaned.slice(-4) || null;
+      }
+
+      return {
+        creditorName: debt.creditorName || 'Unknown Creditor',
+        accountNumber: debt.accountNumber || null,
+        accountLast4,
+        debtType: debt.debtType || 'other',
+        originalAmount: debt.originalAmount ? parseFloat(debt.originalAmount) : null,
+        currentBalance: parseFloat(debt.currentBalance) || 0,
+        monthlyPayment: debt.monthlyPayment ? parseFloat(debt.monthlyPayment) : null,
+        isSecured: debt.isSecured || false,
+        collateralDescription: debt.collateralDescription || null,
+        statementDate: this.normalizeDate(debt.statementDate),
+        source: 'llm-extraction',
+        confidence: debt.confidence || 0.7,
+      };
+    });
+  }
+
+  /**
+   * Normalize date to YYYY-MM-DD format
+   */
+  private normalizeDate(date: string | null | undefined): string | null {
+    if (!date) return null;
+
+    // Already in YYYY-MM-DD format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return date;
+    }
+
+    // Try to parse various formats
+    try {
+      const parsed = new Date(date);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10);
+      }
+    } catch (e) {
+      // Parsing failed
+    }
+
+    return null;
   }
 
   private normalizeAssetData(extracted: any): ExtractedAsset[] {
@@ -740,15 +791,27 @@ IMPORTANT:
       return [];
     }
 
-    return extracted.assets.map((asset: any) => ({
-      assetType: asset.assetType || 'other',
-      description: asset.description || 'Unknown asset',
-      estimatedValue: parseFloat(asset.estimatedValue) || 0,
-      ownershipPercentage: parseFloat(asset.ownershipPercentage) || 100,
-      isExempt: asset.isExempt !== undefined ? asset.isExempt : null,
-      encumbrances: parseFloat(asset.encumbrances) || 0,
-      source: 'llm-extraction',
-      confidence: asset.confidence || 0.7,
-    }));
+    return extracted.assets.map((asset: any) => {
+      // Extract last 4 digits if provided
+      let accountLast4 = asset.accountLast4 || null;
+      if (!accountLast4 && asset.accountNumber) {
+        const cleaned = asset.accountNumber.replace(/\D/g, '');
+        accountLast4 = cleaned.slice(-4) || null;
+      }
+
+      return {
+        assetType: asset.assetType || 'other',
+        description: asset.description || 'Unknown asset',
+        estimatedValue: parseFloat(asset.estimatedValue) || 0,
+        ownershipPercentage: parseFloat(asset.ownershipPercentage) || 100,
+        isExempt: asset.isExempt !== undefined ? asset.isExempt : null,
+        encumbrances: parseFloat(asset.encumbrances) || 0,
+        accountLast4,
+        institutionName: asset.institutionName || null,
+        statementDate: this.normalizeDate(asset.statementDate),
+        source: 'llm-extraction',
+        confidence: asset.confidence || 0.7,
+      };
+    });
   }
 }

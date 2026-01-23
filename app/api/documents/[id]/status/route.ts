@@ -160,18 +160,37 @@ export async function GET(
             } catch (e) { extractionWarnings.push("Income extraction failed"); }
           }
 
-          // Extract debts
+          // Extract debts with "most recent wins" logic for credit cards
           if (isDebtDocument) {
             sendStatus("extracting", "AI extraction in progress...", 60);
             try {
               const debts = await extractor.extractDebts(ocrText, doc.documentType);
               for (const debt of debts) {
-                const existingDebts = await sql`SELECT id FROM debts WHERE case_id = ${doc.caseId} AND LOWER(creditor_name) = LOWER(${debt.creditorName}) AND ABS(balance - ${debt.currentBalance}) < 1`;
-                if (existingDebts.length > 0) { extractionWarnings.push(`Skipped duplicate debt: ${debt.creditorName}`); continue; }
+                const accountLast4 = debt.accountLast4 || (debt.accountNumber?.replace(/\D/g, '').slice(-4)) || null;
+
+                // For credit cards and loans with account numbers, use "most recent wins" logic
+                if (accountLast4 && (debt.debtType === 'credit-card' || debt.debtType === 'personal-loan' || debt.debtType === 'auto-loan' || debt.debtType === 'mortgage')) {
+                  const existingDebts = await sql`SELECT id, statement_date, balance FROM debts WHERE case_id = ${doc.caseId} AND account_last4 = ${accountLast4} AND LOWER(creditor_name) = LOWER(${debt.creditorName})`;
+                  if (existingDebts.length > 0) {
+                    const existing = existingDebts[0];
+                    const existingDate = existing.statement_date ? new Date(existing.statement_date) : null;
+                    const newDate = debt.statementDate ? new Date(debt.statementDate) : null;
+                    if (!existingDate || (newDate && newDate > existingDate)) {
+                      await sql`UPDATE debts SET balance = ${debt.currentBalance}, statement_date = ${debt.statementDate}, document_id = ${documentId}, monthly_payment = ${debt.monthlyPayment}, confidence = ${debt.confidence} WHERE id = ${existing.id}`;
+                      extractionWarnings.push(`Updated ${debt.debtType} ****${accountLast4} with more recent balance: $${debt.currentBalance}`);
+                    } else {
+                      extractionWarnings.push(`Skipped older statement for ${debt.debtType} ****${accountLast4}`);
+                    }
+                    continue;
+                  }
+                } else {
+                  const existingDebts = await sql`SELECT id FROM debts WHERE case_id = ${doc.caseId} AND LOWER(creditor_name) = LOWER(${debt.creditorName}) AND ABS(balance - ${debt.currentBalance}) < 1`;
+                  if (existingDebts.length > 0) { extractionWarnings.push(`Skipped duplicate debt: ${debt.creditorName}`); continue; }
+                }
                 const recordId = `debt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
                 await sql`
-                  INSERT INTO debts (id, case_id, document_id, creditor_name, account_last4, balance, monthly_payment, debt_type, secured, collateral, confidence, created_at)
-                  VALUES (${recordId}, ${doc.caseId}, ${documentId}, ${debt.creditorName}, ${debt.accountNumber?.slice(-4) || null}, ${debt.currentBalance}, ${debt.monthlyPayment}, ${debt.debtType}, ${debt.isSecured}, ${debt.collateralDescription}, ${debt.confidence}, NOW())
+                  INSERT INTO debts (id, case_id, document_id, creditor_name, account_last4, balance, monthly_payment, debt_type, secured, collateral, statement_date, confidence, created_at)
+                  VALUES (${recordId}, ${doc.caseId}, ${documentId}, ${debt.creditorName}, ${accountLast4}, ${debt.currentBalance}, ${debt.monthlyPayment}, ${debt.debtType}, ${debt.isSecured}, ${debt.collateralDescription}, ${debt.statementDate}, ${debt.confidence}, NOW())
                   ON CONFLICT DO NOTHING
                 `;
                 extractedDebtCount++;
@@ -179,18 +198,35 @@ export async function GET(
             } catch (e) { extractionWarnings.push("Debt extraction failed"); }
           }
 
-          // Extract assets
+          // Extract assets with "most recent wins" logic for bank accounts
           if (isAssetDocument) {
             sendStatus("extracting", "AI extraction in progress...", 70);
             try {
               const assets = await extractor.extractAssets(ocrText, doc.documentType);
               for (const asset of assets) {
-                const existingAssets = await sql`SELECT id FROM assets WHERE case_id = ${doc.caseId} AND asset_type = ${asset.assetType} AND ABS(current_value - ${asset.estimatedValue}) < 1`;
-                if (existingAssets.length > 0) { extractionWarnings.push(`Skipped duplicate asset: ${asset.description}`); continue; }
+                // For bank accounts, use "most recent wins" logic based on account number
+                if (asset.assetType === 'bank-account' && asset.accountLast4) {
+                  const existingAccounts = await sql`SELECT id, statement_date, current_value FROM assets WHERE case_id = ${doc.caseId} AND asset_type = 'bank-account' AND account_number_last4 = ${asset.accountLast4}`;
+                  if (existingAccounts.length > 0) {
+                    const existing = existingAccounts[0];
+                    const existingDate = existing.statement_date ? new Date(existing.statement_date) : null;
+                    const newDate = asset.statementDate ? new Date(asset.statementDate) : null;
+                    if (!existingDate || (newDate && newDate > existingDate)) {
+                      await sql`UPDATE assets SET current_value = ${asset.estimatedValue}, statement_date = ${asset.statementDate}, document_id = ${documentId}, description = ${asset.description}, institution = ${asset.institutionName}, confidence = ${asset.confidence} WHERE id = ${existing.id}`;
+                      extractionWarnings.push(`Updated bank account ****${asset.accountLast4} with more recent balance: $${asset.estimatedValue}`);
+                    } else {
+                      extractionWarnings.push(`Skipped older statement for bank account ****${asset.accountLast4}`);
+                    }
+                    continue;
+                  }
+                } else {
+                  const existingAssets = await sql`SELECT id FROM assets WHERE case_id = ${doc.caseId} AND asset_type = ${asset.assetType} AND ABS(current_value - ${asset.estimatedValue}) < 1`;
+                  if (existingAssets.length > 0) { extractionWarnings.push(`Skipped duplicate asset: ${asset.description}`); continue; }
+                }
                 const recordId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
                 await sql`
-                  INSERT INTO assets (id, case_id, document_id, asset_type, description, current_value, ownership_percentage, confidence, created_at)
-                  VALUES (${recordId}, ${doc.caseId}, ${documentId}, ${asset.assetType}, ${asset.description}, ${asset.estimatedValue}, ${asset.ownershipPercentage}, ${asset.confidence}, NOW())
+                  INSERT INTO assets (id, case_id, document_id, asset_type, description, current_value, institution, account_number_last4, statement_date, ownership_percentage, confidence, created_at)
+                  VALUES (${recordId}, ${doc.caseId}, ${documentId}, ${asset.assetType}, ${asset.description}, ${asset.estimatedValue}, ${asset.institutionName}, ${asset.accountLast4}, ${asset.statementDate}, ${asset.ownershipPercentage}, ${asset.confidence}, NOW())
                   ON CONFLICT DO NOTHING
                 `;
                 extractedAssetCount++;
@@ -452,7 +488,7 @@ export async function GET(
                     const debts = await extractor.extractDebts(ocrText, doc.documentType);
 
                     if (debts.length > 0) {
-                      // Ensure debts table exists
+                      // Ensure debts table exists with statement_date for "most recent wins" logic
                       await sql`
                         CREATE TABLE IF NOT EXISTS debts (
                           id TEXT PRIMARY KEY,
@@ -471,12 +507,13 @@ export async function GET(
                           collateral TEXT,
                           collateral_value DECIMAL(10, 2),
                           date_incurred DATE,
+                          statement_date DATE,
                           confidence DECIMAL(3, 2),
                           created_at TIMESTAMP NOT NULL DEFAULT NOW()
                         )
                       `;
 
-                      // Add document_id column if missing
+                      // Add missing columns for new schema
                       await sql`
                         DO $$
                         BEGIN
@@ -486,42 +523,87 @@ export async function GET(
                           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='debts' AND column_name='confidence') THEN
                             ALTER TABLE debts ADD COLUMN confidence DECIMAL(3, 2);
                           END IF;
+                          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='debts' AND column_name='statement_date') THEN
+                            ALTER TABLE debts ADD COLUMN statement_date DATE;
+                          END IF;
+                          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='debts' AND column_name='account_last4') THEN
+                            ALTER TABLE debts ADD COLUMN account_last4 TEXT;
+                          END IF;
                         END $$;
                       `;
 
                       for (const debt of debts) {
-                        // Check for duplicate: same case, creditor name (case-insensitive), and similar balance
-                        const existingDebts = await sql`
-                          SELECT id FROM debts
-                          WHERE case_id = ${doc.caseId}
-                            AND LOWER(creditor_name) = LOWER(${debt.creditorName})
-                            AND ABS(balance - ${debt.currentBalance}) < 1
-                        `;
+                        // Get the account last 4 digits
+                        const accountLast4 = debt.accountLast4 || (debt.accountNumber?.replace(/\D/g, '').slice(-4)) || null;
 
-                        if (existingDebts.length > 0) {
-                          extractionWarnings.push(`Skipped duplicate debt: ${debt.creditorName}`);
-                          continue;
+                        // For credit cards and loans with account numbers, use "most recent wins" logic
+                        if (accountLast4 && (debt.debtType === 'credit-card' || debt.debtType === 'personal-loan' || debt.debtType === 'auto-loan' || debt.debtType === 'mortgage')) {
+                          // Check for existing debt with same account number and creditor
+                          const existingDebts = await sql`
+                            SELECT id, statement_date, balance FROM debts
+                            WHERE case_id = ${doc.caseId}
+                              AND account_last4 = ${accountLast4}
+                              AND LOWER(creditor_name) = LOWER(${debt.creditorName})
+                          `;
+
+                          if (existingDebts.length > 0) {
+                            const existing = existingDebts[0];
+                            const existingDate = existing.statement_date ? new Date(existing.statement_date) : null;
+                            const newDate = debt.statementDate ? new Date(debt.statementDate) : null;
+
+                            // If new statement is more recent (or existing has no date), update
+                            if (!existingDate || (newDate && newDate > existingDate)) {
+                              await sql`
+                                UPDATE debts
+                                SET balance = ${debt.currentBalance},
+                                    statement_date = ${debt.statementDate},
+                                    document_id = ${documentId},
+                                    monthly_payment = ${debt.monthlyPayment},
+                                    confidence = ${debt.confidence}
+                                WHERE id = ${existing.id}
+                              `;
+                              extractionWarnings.push(`Updated ${debt.debtType} ****${accountLast4} with more recent balance: $${debt.currentBalance}`);
+                            } else {
+                              extractionWarnings.push(`Skipped older statement for ${debt.debtType} ****${accountLast4}`);
+                            }
+                            continue;
+                          }
+                        } else {
+                          // For other debts (medical, collection, etc.), check for duplicate by creditor and similar balance
+                          const existingDebts = await sql`
+                            SELECT id FROM debts
+                            WHERE case_id = ${doc.caseId}
+                              AND LOWER(creditor_name) = LOWER(${debt.creditorName})
+                              AND ABS(balance - ${debt.currentBalance}) < 1
+                          `;
+
+                          if (existingDebts.length > 0) {
+                            extractionWarnings.push(`Skipped duplicate debt: ${debt.creditorName}`);
+                            continue;
+                          }
                         }
 
+                        // Insert new debt
                         const recordId = `debt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
                         await sql`
                           INSERT INTO debts (
                             id, case_id, document_id, creditor_name, account_last4,
                             balance, monthly_payment, debt_type, secured, collateral,
-                            collateral_value, confidence, created_at
+                            collateral_value, statement_date, confidence, created_at
                           ) VALUES (
                             ${recordId},
                             ${doc.caseId},
                             ${documentId},
                             ${debt.creditorName},
-                            ${debt.accountNumber?.slice(-4) || null},
+                            ${accountLast4},
                             ${debt.currentBalance},
                             ${debt.monthlyPayment},
                             ${debt.debtType},
                             ${debt.isSecured},
                             ${debt.collateralDescription},
                             ${null},
+                            ${debt.statementDate},
                             ${debt.confidence},
                             NOW()
                           )
@@ -545,7 +627,7 @@ export async function GET(
                     const assets = await extractor.extractAssets(ocrText, doc.documentType);
 
                     if (assets.length > 0) {
-                      // Ensure assets table exists
+                      // Ensure assets table exists with statement_date for "most recent wins" logic
                       await sql`
                         CREATE TABLE IF NOT EXISTS assets (
                           id TEXT PRIMARY KEY,
@@ -561,13 +643,14 @@ export async function GET(
                           vin TEXT,
                           institution TEXT,
                           account_number_last4 TEXT,
+                          statement_date DATE,
                           ownership_percentage DECIMAL(5, 2) DEFAULT 100,
                           confidence DECIMAL(3, 2),
                           created_at TIMESTAMP NOT NULL DEFAULT NOW()
                         )
                       `;
 
-                      // Add document_id column if missing
+                      // Add missing columns for new schema
                       await sql`
                         DO $$
                         BEGIN
@@ -577,28 +660,74 @@ export async function GET(
                           IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='confidence') THEN
                             ALTER TABLE assets ADD COLUMN confidence DECIMAL(3, 2);
                           END IF;
+                          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='statement_date') THEN
+                            ALTER TABLE assets ADD COLUMN statement_date DATE;
+                          END IF;
+                          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='institution') THEN
+                            ALTER TABLE assets ADD COLUMN institution TEXT;
+                          END IF;
+                          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='assets' AND column_name='account_number_last4') THEN
+                            ALTER TABLE assets ADD COLUMN account_number_last4 TEXT;
+                          END IF;
                         END $$;
                       `;
 
                       for (const asset of assets) {
-                        // Check for duplicate: same case, asset type, and similar value
-                        const existingAssets = await sql`
-                          SELECT id FROM assets
-                          WHERE case_id = ${doc.caseId}
-                            AND asset_type = ${asset.assetType}
-                            AND ABS(current_value - ${asset.estimatedValue}) < 1
-                        `;
+                        // For bank accounts, use "most recent wins" logic based on account number
+                        if (asset.assetType === 'bank-account' && asset.accountLast4) {
+                          // Check for existing account with same last 4 digits
+                          const existingAccounts = await sql`
+                            SELECT id, statement_date, current_value FROM assets
+                            WHERE case_id = ${doc.caseId}
+                              AND asset_type = 'bank-account'
+                              AND account_number_last4 = ${asset.accountLast4}
+                          `;
 
-                        if (existingAssets.length > 0) {
-                          extractionWarnings.push(`Skipped duplicate asset: ${asset.description}`);
-                          continue;
+                          if (existingAccounts.length > 0) {
+                            const existing = existingAccounts[0];
+                            const existingDate = existing.statement_date ? new Date(existing.statement_date) : null;
+                            const newDate = asset.statementDate ? new Date(asset.statementDate) : null;
+
+                            // If new statement is more recent (or existing has no date), update
+                            if (!existingDate || (newDate && newDate > existingDate)) {
+                              await sql`
+                                UPDATE assets
+                                SET current_value = ${asset.estimatedValue},
+                                    statement_date = ${asset.statementDate},
+                                    document_id = ${documentId},
+                                    description = ${asset.description},
+                                    institution = ${asset.institutionName},
+                                    confidence = ${asset.confidence}
+                                WHERE id = ${existing.id}
+                              `;
+                              extractionWarnings.push(`Updated bank account ****${asset.accountLast4} with more recent balance: $${asset.estimatedValue}`);
+                            } else {
+                              extractionWarnings.push(`Skipped older statement for bank account ****${asset.accountLast4}`);
+                            }
+                            continue;
+                          }
+                        } else {
+                          // For non-bank-account assets, check for duplicate by type and similar value
+                          const existingAssets = await sql`
+                            SELECT id FROM assets
+                            WHERE case_id = ${doc.caseId}
+                              AND asset_type = ${asset.assetType}
+                              AND ABS(current_value - ${asset.estimatedValue}) < 1
+                          `;
+
+                          if (existingAssets.length > 0) {
+                            extractionWarnings.push(`Skipped duplicate asset: ${asset.description}`);
+                            continue;
+                          }
                         }
 
+                        // Insert new asset
                         const recordId = `asset_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
                         await sql`
                           INSERT INTO assets (
                             id, case_id, document_id, asset_type, description, current_value,
+                            institution, account_number_last4, statement_date,
                             ownership_percentage, confidence, created_at
                           ) VALUES (
                             ${recordId},
@@ -607,6 +736,9 @@ export async function GET(
                             ${asset.assetType},
                             ${asset.description},
                             ${asset.estimatedValue},
+                            ${asset.institutionName},
+                            ${asset.accountLast4},
+                            ${asset.statementDate},
                             ${asset.ownershipPercentage},
                             ${asset.confidence},
                             NOW()
