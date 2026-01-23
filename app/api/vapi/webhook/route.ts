@@ -55,33 +55,57 @@ function getUserId(metadata?: Record<string, unknown>): string | null {
   return null;
 }
 
+// GET endpoint for health check / testing
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'VAPI webhook endpoint is accessible',
+    timestamp: new Date().toISOString(),
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: VapiRequest = await request.json();
 
-    // Verify this is a function call
+    // Log incoming request for debugging
+    console.log('[VAPI Webhook] Received request:', {
+      messageType: body.message?.type,
+      hasMetadata: !!body.call?.metadata,
+    });
+
+    // Only process function calls, ignore other message types (status, transcripts, etc.)
     if (body.message?.type !== 'function-call') {
-      return NextResponse.json({ error: 'Not a function call' }, { status: 400 });
+      console.log('[VAPI Webhook] Ignoring non-function-call message:', body.message?.type);
+      return NextResponse.json({ success: true, message: 'Message received' }, { status: 200 });
     }
 
     const { name, parameters } = body.message.functionCall;
     const connectionString = getConnectionString(body.call?.metadata);
     const userId = getUserId(body.call?.metadata);
 
+    console.log('[VAPI Webhook] Function call:', {
+      functionName: name,
+      hasConnectionString: !!connectionString,
+      hasUserId: !!userId,
+    });
+
     if (!connectionString) {
+      console.error('[VAPI Webhook] Missing connectionString in metadata');
       return NextResponse.json({
         result: JSON.stringify({
           success: false,
-          error: 'Database connection not configured',
+          error: 'Database connection not configured. Ensure connectionString is passed in call metadata.',
         }),
       });
     }
 
     if (!userId) {
+      console.error('[VAPI Webhook] Missing userId in metadata');
       return NextResponse.json({
         result: JSON.stringify({
           success: false,
-          error: 'User ID not provided in metadata',
+          error: 'User ID not provided in metadata. Ensure userId is passed in call metadata.',
         }),
       });
     }
@@ -111,15 +135,20 @@ export async function POST(request: NextRequest) {
           result = await getRequiredDocuments(sql, parameters, userId);
           break;
         default:
+          console.error('[VAPI Webhook] Unknown function:', name);
           result = { success: false, error: `Unknown function: ${name}` };
       }
 
+      console.log('[VAPI Webhook] Function result:', { function: name, result });
       return NextResponse.json({ result: JSON.stringify(result) });
     } finally {
       await sql.end();
     }
   } catch (error: any) {
-    console.error('Vapi webhook error:', error);
+    console.error('[VAPI Webhook] Error processing request:', {
+      error: error.message,
+      stack: error.stack,
+    });
     return NextResponse.json({
       result: JSON.stringify({
         success: false,
