@@ -55,13 +55,11 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
 
     // Pass connection string and userId as metadata so webhook can access the database
     // userId works regardless of whether Better Auth is enabled or disabled
-    // Note: VAPI Web SDK expects assistantOverrides structure
+    // Note: The parameter passed to startCall IS the assistantOverrides object
     await startCall({
-      assistantOverrides: {
-        metadata: {
-          connectionString: connectionString,
-          userId: currentUserId,
-        },
+      metadata: {
+        connectionString: connectionString,
+        userId: currentUserId,
       },
     });
   };
