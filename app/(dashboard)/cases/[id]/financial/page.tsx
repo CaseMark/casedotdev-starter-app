@@ -20,6 +20,10 @@ import {
   Loader2,
   FileText,
   ArrowLeft,
+  RefreshCw,
+  ShieldCheck,
+  AlertTriangle,
+  FileWarning,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -95,6 +99,39 @@ interface DebtRecord {
   priority: boolean;
   collateral: string | null;
   collateralValue: number | null;
+}
+
+interface ReconciledIncomeSource {
+  id: string;
+  employerName: string;
+  employerEIN: string | null;
+  incomeType: string;
+  incomeYear: number;
+  verifiedAnnualGross: number;
+  verifiedMonthlyGross: number;
+  verifiedAnnualNet: number | null;
+  verifiedMonthlyNet: number | null;
+  determinationMethod: string;
+  evidence: any[];
+  confidence: number;
+  status: 'verified' | 'needs_review' | 'conflict' | 'manual';
+  discrepancy: {
+    maxVariance: number;
+    conflictingDocuments: string[];
+    suggestedResolution: string;
+  } | null;
+}
+
+interface ReconciliationSummary {
+  caseId: string;
+  sources: ReconciledIncomeSource[];
+  totalMonthlyGross: number;
+  totalAnnualGross: number;
+  totalMonthlyNet: number | null;
+  currentMonthlyIncome: number;
+  allSourcesReconciled: boolean;
+  sourcesNeedingReview: string[];
+  lastCalculatedAt: string;
 }
 
 // Delete item type for confirmation modal
@@ -174,6 +211,10 @@ export default function CaseFinancialPage() {
   const [assetRecords, setAssetRecords] = useState<AssetRecord[]>([]);
   const [debtRecords, setDebtRecords] = useState<DebtRecord[]>([]);
 
+  // Reconciled income
+  const [reconciliationSummary, setReconciliationSummary] = useState<ReconciliationSummary | null>(null);
+  const [reconciling, setReconciling] = useState(false);
+
   // Modal states
   const [addIncomeOpen, setAddIncomeOpen] = useState(false);
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
@@ -192,16 +233,17 @@ export default function CaseFinancialPage() {
     if (!connectionString) return;
 
     try {
-      const [incomeRes, expenseRes, assetRes, debtRes] = await Promise.all([
+      const [incomeRes, expenseRes, assetRes, debtRes, reconcileRes] = await Promise.all([
         fetch(`/api/cases/${id}/income?connectionString=${encodeURIComponent(connectionString)}`),
         fetch(`/api/cases/${id}/expenses?connectionString=${encodeURIComponent(connectionString)}`),
         fetch(`/api/cases/${id}/assets?connectionString=${encodeURIComponent(connectionString)}`),
         fetch(`/api/cases/${id}/debts?connectionString=${encodeURIComponent(connectionString)}`),
+        fetch(`/api/cases/${id}/income/reconcile?connectionString=${encodeURIComponent(connectionString)}`),
       ]);
 
       if (incomeRes.ok) {
         const data = await incomeRes.json();
-        setIncomeRecords(data.incomeRecords || []);
+        setIncomeRecords(data.incomeRecords || data.income || []);
       }
       if (expenseRes.ok) {
         const data = await expenseRes.json();
@@ -215,8 +257,34 @@ export default function CaseFinancialPage() {
         const data = await debtRes.json();
         setDebtRecords(data.debts || []);
       }
+      if (reconcileRes.ok) {
+        const data = await reconcileRes.json();
+        setReconciliationSummary(data.summary || null);
+      }
     } catch (err) {
       console.error("Error fetching financial data:", err);
+    }
+  }, [id, connectionString]);
+
+  const triggerReconciliation = useCallback(async () => {
+    if (!connectionString) return;
+
+    setReconciling(true);
+    try {
+      const apiKey = localStorage.getItem("casedev_api_key");
+      const res = await fetch(
+        `/api/cases/${id}/income/reconcile?connectionString=${encodeURIComponent(connectionString)}${apiKey ? `&apiKey=${encodeURIComponent(apiKey)}` : ''}`,
+        { method: 'POST' }
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+        setReconciliationSummary(data.summary || null);
+      }
+    } catch (err) {
+      console.error("Error reconciling income:", err);
+    } finally {
+      setReconciling(false);
     }
   }, [id, connectionString]);
 
@@ -495,6 +563,183 @@ export default function CaseFinancialPage() {
           </div>
         </div>
       </div>
+
+      {/* Reconciled Income Section */}
+      {(reconciliationSummary && reconciliationSummary.sources.length > 0) && (
+        <div className="bg-card p-6 rounded-lg border mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <ShieldCheck className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold">Reconciled Income</h2>
+                <p className="text-sm text-muted-foreground">
+                  Income verified across multiple documents
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={triggerReconciliation}
+              disabled={reconciling}
+            >
+              {reconciling ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Re-reconcile
+            </Button>
+          </div>
+
+          {/* Reconciliation Status Banner */}
+          {!reconciliationSummary.allSourcesReconciled && (
+            <div className="p-3 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800">
+                  {reconciliationSummary.sourcesNeedingReview.length} income source(s) need review
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  There are discrepancies between documents that should be manually verified.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Reconciled Sources List */}
+          <div className="space-y-3">
+            {reconciliationSummary.sources.map((source) => (
+              <div
+                key={source.id}
+                className={`p-4 rounded-lg border ${
+                  source.status === 'verified'
+                    ? 'bg-green-50 border-green-200'
+                    : source.status === 'conflict'
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-yellow-50 border-yellow-200'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    {source.status === 'verified' ? (
+                      <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                    ) : source.status === 'conflict' ? (
+                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                    ) : (
+                      <FileWarning className="w-5 h-5 text-yellow-600 mt-0.5" />
+                    )}
+                    <div>
+                      <p className="font-medium">{source.employerName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {source.incomeType.replace('_', ' ')}
+                        {source.employerEIN && ` • EIN: ${source.employerEIN}`}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          source.status === 'verified'
+                            ? 'bg-green-100 text-green-700'
+                            : source.status === 'conflict'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {source.status === 'verified' ? 'Verified' :
+                           source.status === 'conflict' ? 'Conflict' : 'Needs Review'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {source.evidence.length} document(s) •{' '}
+                          {Math.round(source.confidence * 100)}% confidence
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold">
+                      ${source.verifiedMonthlyGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      ${source.verifiedAnnualGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr
+                    </p>
+                  </div>
+                </div>
+
+                {/* Discrepancy Info */}
+                {source.discrepancy && (
+                  <div className="mt-3 pt-3 border-t border-current/10">
+                    <p className="text-sm">
+                      <span className="font-medium">Variance:</span>{' '}
+                      {(source.discrepancy.maxVariance * 100).toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {source.discrepancy.suggestedResolution}
+                    </p>
+                  </div>
+                )}
+
+                {/* Evidence Breakdown */}
+                {source.evidence.length > 1 && (
+                  <details className="mt-3 pt-3 border-t border-current/10">
+                    <summary className="text-sm font-medium cursor-pointer hover:text-primary">
+                      View document sources ({source.evidence.length})
+                    </summary>
+                    <div className="mt-2 space-y-1">
+                      {source.evidence.map((ev, idx) => (
+                        <div key={idx} className="text-sm flex justify-between px-2 py-1 bg-white/50 rounded">
+                          <span className="capitalize">{ev.documentType.replace('_', ' ')}</span>
+                          <span>${ev.annualizedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Reconciled Totals */}
+          <div className="mt-4 pt-4 border-t flex justify-between items-center">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Reconciled Income</p>
+              <p className="text-xs text-muted-foreground">
+                Last calculated: {new Date(reconciliationSummary.lastCalculatedAt).toLocaleString()}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold">
+                ${reconciliationSummary.totalMonthlyGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
+              </p>
+              <p className="text-sm text-muted-foreground">
+                ${reconciliationSummary.totalAnnualGross.toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reconcile Button when no reconciliation exists but income records do */}
+      {(!reconciliationSummary || reconciliationSummary.sources.length === 0) && incomeRecords.length > 0 && (
+        <div className="p-4 mb-8 bg-muted/50 rounded-lg border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="w-6 h-6 text-muted-foreground" />
+            <div>
+              <p className="font-medium">Income Reconciliation Available</p>
+              <p className="text-sm text-muted-foreground">
+                Verify income by cross-referencing pay stubs, W-2s, and bank statements
+              </p>
+            </div>
+          </div>
+          <Button onClick={triggerReconciliation} disabled={reconciling}>
+            {reconciling ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <ShieldCheck className="w-4 h-4 mr-2" />
+            )}
+            Reconcile Income
+          </Button>
+        </div>
+      )}
 
       {/* Key Metrics - Only show if there's data */}
       {hasFinancialData && (
