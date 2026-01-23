@@ -321,19 +321,19 @@ async function updateCaseIntake(
   await sql`
     UPDATE bankruptcy_cases
     SET
-      client_email = COALESCE(${updates.client_email || null}, client_email),
-      client_phone = COALESCE(${updates.client_phone || null}, client_phone),
-      ssn_last4 = COALESCE(${updates.ssn_last4 || null}, ssn_last4),
-      address = COALESCE(${updates.address || null}, address),
-      city = COALESCE(${updates.city || null}, city),
-      state = COALESCE(${updates.state || null}, state),
-      zip = COALESCE(${updates.zip || null}, zip),
-      county = COALESCE(${updates.county || null}, county),
-      household_size = COALESCE(${updates.household_size ? Number(updates.household_size) : null}, household_size),
-      case_type = COALESCE(${updates.case_type || null}, case_type),
-      filing_type = COALESCE(${updates.filing_type || null}, filing_type),
+      client_email = COALESCE(${(updates.client_email as string) ?? null}, client_email),
+      client_phone = COALESCE(${(updates.client_phone as string) ?? null}, client_phone),
+      ssn_last4 = COALESCE(${(updates.ssn_last4 as string) ?? null}, ssn_last4),
+      address = COALESCE(${(updates.address as string) ?? null}, address),
+      city = COALESCE(${(updates.city as string) ?? null}, city),
+      state = COALESCE(${(updates.state as string) ?? null}, state),
+      zip = COALESCE(${(updates.zip as string) ?? null}, zip),
+      county = COALESCE(${(updates.county as string) ?? null}, county),
+      household_size = COALESCE(${updates.household_size !== undefined ? Number(updates.household_size) : null}, household_size),
+      case_type = COALESCE(${(updates.case_type as string) ?? null}, case_type),
+      filing_type = COALESCE(${(updates.filing_type as string) ?? null}, filing_type),
       updated_at = NOW()
-    WHERE id = ${caseId}
+    WHERE id = ${caseId as string}
   `;
 
   const fieldsUpdated = Object.keys(updates).length;

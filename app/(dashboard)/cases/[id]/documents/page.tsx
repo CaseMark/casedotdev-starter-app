@@ -243,7 +243,7 @@ export default function CaseDocumentsPage() {
         }
 
         const caseResult = await caseResponse.json();
-        setCaseData(caseResult);
+        setCaseData(caseResult.case);
 
         await fetchDocuments();
       } catch (err) {

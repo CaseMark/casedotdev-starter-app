@@ -106,7 +106,7 @@ export function AddExpenseModal({ open, onOpenChange, caseId, onSuccess }: AddEx
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>Add Monthly Expense</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Add Monthly Expense</DialogTitle>
           <DialogDescription>
             Enter monthly living expense for Schedule J.
           </DialogDescription>
@@ -123,12 +123,12 @@ export function AddExpenseModal({ open, onOpenChange, caseId, onSuccess }: AddEx
             <Label htmlFor="category">Category *</Label>
             <Select
               value={formData.category}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, category: value || prev.category }))}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select category" />
+                <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[240px]">
                 {EXPENSE_CATEGORIES.map((cat) => (
                   <SelectItem key={cat.value} value={cat.value}>
                     {cat.label}

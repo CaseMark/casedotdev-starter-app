@@ -107,7 +107,7 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Income Source</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Add Income Source</DialogTitle>
           <DialogDescription>
             Enter income details for the bankruptcy case.
           </DialogDescription>
@@ -125,12 +125,12 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
               <Label htmlFor="incomeSource">Income Source</Label>
               <Select
                 value={formData.incomeSource}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, incomeSource: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, incomeSource: value || prev.incomeSource }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[240px]">
                   {INCOME_SOURCES.map((source) => (
                     <SelectItem key={source.value} value={source.value}>
                       {source.label}
@@ -144,12 +144,12 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
               <Label htmlFor="payPeriod">Pay Period</Label>
               <Select
                 value={formData.payPeriod}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, payPeriod: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, payPeriod: value || prev.payPeriod }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select period" />
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[160px]">
                   {PAY_PERIODS.map((period) => (
                     <SelectItem key={period.value} value={period.value}>
                       {period.label}

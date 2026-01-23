@@ -122,7 +122,7 @@ export function AddAssetModal({ open, onOpenChange, caseId, onSuccess }: AddAsse
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>Add Asset</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Add Asset</DialogTitle>
           <DialogDescription>
             Enter asset information for the bankruptcy schedules.
           </DialogDescription>
@@ -140,12 +140,12 @@ export function AddAssetModal({ open, onOpenChange, caseId, onSuccess }: AddAsse
               <Label htmlFor="assetType">Asset Type *</Label>
               <Select
                 value={formData.assetType}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, assetType: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, assetType: value || prev.assetType }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[200px]">
                   {ASSET_TYPES.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
