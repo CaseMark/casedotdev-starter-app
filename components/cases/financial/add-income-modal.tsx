@@ -51,15 +51,50 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
     occupation: '',
     grossPay: '',
     netPay: '',
-    payPeriod: 'monthly',
-    incomeSource: 'employment',
+    payPeriod: '',
+    incomeSource: '',
     ytdGross: '',
   });
+
+  const getIncomeSourceLabel = (value: string) => {
+    const found = INCOME_SOURCES.find(source => source.value === value);
+    return found ? found.label : 'Choose One...';
+  };
+
+  const getPayPeriodLabel = (value: string) => {
+    const found = PAY_PERIODS.find(period => period.value === value);
+    return found ? found.label : 'Choose One...';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Validate required fields
+    if (!formData.incomeSource) {
+      setError('Please select an income source.');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.payPeriod) {
+      setError('Please select a pay period.');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.employer) {
+      setError('Please enter an employer or source name.');
+      setLoading(false);
+      return;
+    }
+
+    if (!formData.grossPay) {
+      setError('Please enter a gross pay amount.');
+      setLoading(false);
+      return;
+    }
 
     const connectionString = localStorage.getItem('bankruptcy_db_connection');
 
@@ -90,8 +125,8 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
         occupation: '',
         grossPay: '',
         netPay: '',
-        payPeriod: 'monthly',
-        incomeSource: 'employment',
+        payPeriod: '',
+        incomeSource: '',
         ytdGross: '',
       });
       onSuccess();
@@ -107,7 +142,7 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Income Source</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Add Income Source</DialogTitle>
           <DialogDescription>
             Enter income details for the bankruptcy case.
           </DialogDescription>
@@ -125,12 +160,15 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
               <Label htmlFor="incomeSource">Income Source</Label>
               <Select
                 value={formData.incomeSource}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, incomeSource: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, incomeSource: value || prev.incomeSource }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
+                  <SelectValue>
+                    {formData.incomeSource ? getIncomeSourceLabel(formData.incomeSource) : 'Choose One...'}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[240px]">
+                  <SelectItem value="" disabled>Choose One...</SelectItem>
                   {INCOME_SOURCES.map((source) => (
                     <SelectItem key={source.value} value={source.value}>
                       {source.label}
@@ -144,12 +182,15 @@ export function AddIncomeModal({ open, onOpenChange, caseId, onSuccess }: AddInc
               <Label htmlFor="payPeriod">Pay Period</Label>
               <Select
                 value={formData.payPeriod}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, payPeriod: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, payPeriod: value || prev.payPeriod }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select period" />
+                  <SelectValue>
+                    {formData.payPeriod ? getPayPeriodLabel(formData.payPeriod) : 'Choose One...'}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[160px]">
+                  <SelectItem value="" disabled>Choose One...</SelectItem>
                   {PAY_PERIODS.map((period) => (
                     <SelectItem key={period.value} value={period.value}>
                       {period.label}

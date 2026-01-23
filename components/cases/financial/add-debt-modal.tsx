@@ -51,12 +51,17 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
     balance: '',
     monthlyPayment: '',
     interestRate: '',
-    debtType: 'credit_card',
+    debtType: '',
     secured: false,
     priority: false,
     collateral: '',
     collateralValue: '',
   });
+
+  const getDebtTypeLabel = (value: string) => {
+    const found = DEBT_TYPES.find(type => type.value === value);
+    return found ? found.label : 'Choose One...';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +105,7 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
         balance: '',
         monthlyPayment: '',
         interestRate: '',
-        debtType: 'credit_card',
+        debtType: '',
         secured: false,
         priority: false,
         collateral: '',
@@ -119,7 +124,7 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
-          <DialogTitle>Add Debt</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Add Debt</DialogTitle>
           <DialogDescription>
             Enter creditor and debt information.
           </DialogDescription>
@@ -148,12 +153,15 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
               <Label htmlFor="debtType">Debt Type *</Label>
               <Select
                 value={formData.debtType}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, debtType: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, debtType: value || prev.debtType }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue>
+                    {formData.debtType ? getDebtTypeLabel(formData.debtType) : 'Choose One...'}
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[180px]">
+                  <SelectItem value="" disabled>Choose One...</SelectItem>
                   {DEBT_TYPES.map((type) => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
@@ -231,7 +239,7 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
                 checked={formData.secured}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, secured: !!checked }))}
               />
-              <Label htmlFor="secured" className="font-normal">Secured Debt</Label>
+              <Label htmlFor="secured" className="font-normal cursor-pointer">Secured Debt</Label>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -240,7 +248,7 @@ export function AddDebtModal({ open, onOpenChange, caseId, onSuccess }: AddDebtM
                 checked={formData.priority}
                 onCheckedChange={(checked) => setFormData(prev => ({ ...prev, priority: !!checked }))}
               />
-              <Label htmlFor="priority" className="font-normal">Priority Debt</Label>
+              <Label htmlFor="priority" className="font-normal cursor-pointer">Priority Debt</Label>
             </div>
           </div>
 

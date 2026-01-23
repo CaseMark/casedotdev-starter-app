@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   FileText,
   Upload,
   CheckCircle,
-  Clock,
   AlertCircle,
   ChevronRight,
   Download,
@@ -16,7 +15,6 @@ import {
   X,
   ArrowLeft,
   Filter,
-  ChevronDown,
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
@@ -72,13 +70,11 @@ const REQUIRED_DOCUMENTS = [
   { type: "utility", label: "Utility Bills", required: false },
 ];
 
-export default function CaseDocumentsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function CaseDocumentsPage() {
+  const params = useParams();
   const router = useRouter();
-  const [caseId, setCaseId] = useState<string | null>(null);
+  const caseId = params.id as string;
+
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,10 +113,6 @@ export default function CaseDocumentsPage({
 
   const connectionString = typeof window !== 'undefined' ? localStorage.getItem("bankruptcy_db_connection") : null;
   const apiKey = typeof window !== 'undefined' ? localStorage.getItem("casedev_api_key") : null;
-
-  useEffect(() => {
-    params.then((p) => setCaseId(p.id));
-  }, [params]);
 
   // Cleanup SSE connections on unmount
   useEffect(() => {
@@ -251,7 +243,7 @@ export default function CaseDocumentsPage({
         }
 
         const caseResult = await caseResponse.json();
-        setCaseData(caseResult);
+        setCaseData(caseResult.case);
 
         await fetchDocuments();
       } catch (err) {
@@ -563,7 +555,7 @@ export default function CaseDocumentsPage({
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl">
+    <div className="container mx-auto p-6 max-w-7xl">
       {/* Hidden file inputs */}
       <input
         ref={quickUploadRef}
@@ -650,7 +642,7 @@ export default function CaseDocumentsPage({
       )}
 
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-8">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/cases" className="hover:text-foreground">
             Cases
@@ -668,30 +660,36 @@ export default function CaseDocumentsPage({
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold">Documents</h1>
-              <p className="text-muted-foreground text-sm">
-                Manage case documents
+              <h1 className="text-3xl font-bold tracking-tight">Documents</h1>
+              <p className="text-muted-foreground mt-1">
+                Manage case documents and uploads
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Minimal Stats Row */}
-      <div className="flex items-center gap-6 text-sm mb-8 text-muted-foreground">
-        <span>{documentStats.total} total</span>
-        <span className="text-green-600">{documentStats.valid} validated</span>
-        <span className="text-yellow-600">{documentStats.pending} pending</span>
-        {documentStats.invalid > 0 && (
-          <span className="text-red-600">{documentStats.invalid} issues</span>
-        )}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold">{documentStats.total}</div>
+          <div className="text-sm text-muted-foreground">Total Documents</div>
+        </div>
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-green-600">{documentStats.valid}</div>
+          <div className="text-sm text-muted-foreground">Validated</div>
+        </div>
+        <div className="bg-card p-4 rounded-lg border">
+          <div className="text-2xl font-bold text-yellow-600">{documentStats.pending}</div>
+          <div className="text-sm text-muted-foreground">Pending</div>
+        </div>
       </div>
 
       {/* Required Documents Section */}
       {missingRequiredDocs.length > 0 && (
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-medium tracking-wide text-foreground">Required Documents Needed</h2>
+        <div className="bg-card p-6 rounded-lg border mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-foreground">Required Documents Needed</h2>
             <Button
               onClick={() => setShowGuidedUpload(true)}
               className="gap-2"
@@ -753,12 +751,11 @@ export default function CaseDocumentsPage({
 
       {/* Completed Required Documents */}
       {uploadedRequiredDocs.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-base font-medium tracking-wide text-foreground mb-4">Completed</h2>
+        <div className="bg-card p-6 rounded-lg border mb-8">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Completed</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {uploadedRequiredDocs.map((reqDoc) => {
               const uploadedDocs = getDocumentsByType(reqDoc.type);
-              const hasValid = uploadedDocs.some(d => d.validationStatus === "valid");
               return (
                 <div
                   key={reqDoc.type}
@@ -790,8 +787,8 @@ export default function CaseDocumentsPage({
       )}
 
       {/* Upload Section */}
-      <div className="mb-8">
-        <h2 className="text-base font-medium tracking-wide text-foreground mb-4">Upload Documents</h2>
+      <div className="bg-card p-6 rounded-lg border mb-8">
+        <h2 className="text-lg font-semibold text-foreground mb-6">Upload Documents</h2>
 
         {/* Document Type Selection */}
         <div className="mb-4 max-w-xs">
@@ -882,9 +879,9 @@ export default function CaseDocumentsPage({
       </div>
 
       {/* Uploaded Documents List */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-medium tracking-wide text-foreground">Uploaded Documents</h2>
+      <div className="bg-card p-6 rounded-lg border">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-foreground">Uploaded Documents</h2>
 
           {/* Filter Dropdown */}
           <div className="flex items-center gap-2">

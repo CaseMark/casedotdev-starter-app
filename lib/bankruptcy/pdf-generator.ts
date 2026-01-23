@@ -163,7 +163,7 @@ export function generateForm101(data: Form101Data): GeneratedForm {
   y += 24;
 
   // Statistical Information
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 101'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 101'));
   y = addSectionTitle(doc, 'Part 3: Statistical Information', y + 10);
 
   y = addField(doc, 'Estimated Number of Creditors:', data.estimatedCreditors, MARGINS.left, y, 200);
@@ -172,7 +172,7 @@ export function generateForm101(data: Form101Data): GeneratedForm {
   y = addField(doc, 'Estimated Annual Income:', data.estimatedIncome, MARGINS.left, y, 200);
 
   // Signature Block
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 101'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 101'));
   y = addSectionTitle(doc, 'Part 4: Sign Below', y + 20);
 
   doc.setFontSize(FONT_SIZE.small);
@@ -223,7 +223,7 @@ export function generateForm106I(data: Form106IData): GeneratedForm {
     y = addTableRow(doc, ['Employer', 'Occupation', 'Gross Pay', 'Net Pay'], colWidths, y, true);
 
     data.incomeSources.forEach(source => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106I'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106I'));
       y = addTableRow(doc, [
         source.employer,
         source.occupation,
@@ -238,7 +238,7 @@ export function generateForm106I(data: Form106IData): GeneratedForm {
   }
 
   // Other Income
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106I'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 106I'));
   y = addSectionTitle(doc, 'Part 2: Other Income', y + 20);
 
   if (data.otherIncome.length > 0) {
@@ -315,7 +315,7 @@ export function generateForm106J(data: Form106JData): GeneratedForm {
   y = addTableRow(doc, ['Expense Category', 'Monthly Amount'], colWidths, y, true);
 
   expenseItems.forEach(item => {
-    ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106J'));
+    ({ y, pageNum } = checkNewPage(doc, y, 'Form 106J'));
     y = addTableRow(doc, [item.label, formatCurrency(item.value)], colWidths, y);
   });
 
@@ -370,7 +370,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
     y = addTableRow(doc, ['Description', 'Address', 'Current Value'], colWidths, y, true);
 
     data.realProperty.forEach(prop => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
       y = addTableRow(doc, [prop.description, prop.address, formatCurrency(prop.currentValue)], colWidths, y);
     });
   } else {
@@ -380,7 +380,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
   }
 
   // Vehicles
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
   y = addSectionTitle(doc, 'Part 2: Vehicles', y + 20);
 
   if (data.personalProperty.vehicles.length > 0) {
@@ -388,7 +388,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
     y = addTableRow(doc, ['Description', 'Year', 'Current Value'], colWidths, y, true);
 
     data.personalProperty.vehicles.forEach(v => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
       y = addTableRow(doc, [
         `${v.make} ${v.model}`.trim() || v.description,
         v.year?.toString() || 'N/A',
@@ -402,7 +402,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
   }
 
   // Bank Accounts
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
   y = addSectionTitle(doc, 'Part 3: Bank Accounts', y + 20);
 
   if (data.personalProperty.bankAccounts.length > 0) {
@@ -410,7 +410,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
     y = addTableRow(doc, ['Institution', 'Account Type', 'Balance'], colWidths, y, true);
 
     data.personalProperty.bankAccounts.forEach(acct => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
       y = addTableRow(doc, [acct.institution, acct.accountType, formatCurrency(acct.currentValue)], colWidths, y);
     });
   } else {
@@ -420,7 +420,7 @@ export function generateForm106AB(data: Form106ABData): GeneratedForm {
   }
 
   // Summary
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 106A/B'));
   y += 20;
   doc.line(MARGINS.left, y, PAGE_WIDTH - MARGINS.right, y);
   y += 20;
@@ -474,7 +474,7 @@ export function generateForm106D(data: Form106DData): GeneratedForm {
     y = addTableRow(doc, ['Creditor', 'Collateral', 'Value', 'Claim'], colWidths, y, true);
 
     data.securedClaims.forEach(claim => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106D'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106D'));
       y = addTableRow(doc, [
         claim.creditorName,
         claim.collateral || 'N/A',
@@ -537,7 +537,7 @@ export function generateForm106EF(data: Form106EFData): GeneratedForm {
     y = addTableRow(doc, ['Creditor', 'Priority Type', 'Amount'], colWidths, y, true);
 
     data.priorityClaims.forEach(claim => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
       y = addTableRow(doc, [claim.creditorName, claim.priorityType, formatCurrency(claim.amountOfClaim)], colWidths, y);
     });
 
@@ -552,7 +552,7 @@ export function generateForm106EF(data: Form106EFData): GeneratedForm {
   }
 
   // Non-Priority Claims
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
   y = addSectionTitle(doc, 'Part 2: Non-Priority Unsecured Claims', y + 20);
 
   if (data.nonPriorityClaims.length > 0) {
@@ -560,7 +560,7 @@ export function generateForm106EF(data: Form106EFData): GeneratedForm {
     y = addTableRow(doc, ['Creditor', 'Claim Type', 'Amount'], colWidths, y, true);
 
     data.nonPriorityClaims.forEach(claim => {
-      ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
+      ({ y, pageNum } = checkNewPage(doc, y, 'Form 106E/F'));
       y = addTableRow(doc, [claim.creditorName, claim.claimType, formatCurrency(claim.amountOfClaim)], colWidths, y);
     });
 
@@ -644,7 +644,7 @@ export function generateForm122A(data: Form122AData): GeneratedForm {
   }
 
   // Determination
-  ({ doc: doc, y, pageNum } = checkNewPage(doc, y, 'Form 122A'));
+  ({ y, pageNum } = checkNewPage(doc, y, 'Form 122A'));
   y = addSectionTitle(doc, 'Part 3: Determination', y + 20);
 
   y = addField(doc, 'Monthly Disposable Income:', formatCurrency(data.monthlyDisposableIncome), MARGINS.left, y, 200);

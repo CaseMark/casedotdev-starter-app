@@ -551,7 +551,7 @@ export default function CaseFinancialPage() {
               className="flex items-center gap-1 text-sm text-primary hover:underline"
             >
               <Plus className="w-4 h-4" />
-              Add Source
+              Add Income
             </button>
           </div>
 
