@@ -119,9 +119,9 @@ export async function GET(
 
   try {
     // Fetch case data including county for IRS Local Standards
+    // Note: Financial totals are calculated from related tables, not stored on the case
     const caseResult = await sql`
-      SELECT id, client_name, case_type, status, monthly_income, monthly_expenses,
-             total_assets, total_debt, household_size, state, county
+      SELECT id, client_name, case_type, status, household_size, state, county
       FROM bankruptcy_cases
       WHERE id = ${caseId}
     `;
@@ -251,9 +251,9 @@ export async function POST(
 
   try {
     // Fetch case data including county for IRS Local Standards
+    // Note: Financial totals are calculated from related tables, not stored on the case
     const caseResult = await sql`
-      SELECT id, client_name, case_type, status, monthly_income, monthly_expenses,
-             total_assets, total_debt, household_size, state, county
+      SELECT id, client_name, case_type, status, household_size, state, county
       FROM bankruptcy_cases
       WHERE id = ${caseId}
     `;
@@ -304,13 +304,6 @@ export async function POST(
       .filter(d => !d.secured)
       .reduce((sum, d) => sum + Number(d.balance), 0);
 
-    const totalDebt = totalSecuredDebt + totalUnsecuredDebt;
-
-    // Calculate total assets
-    const totalAssets = await sql`
-      SELECT COALESCE(SUM(current_value), 0) as total FROM assets WHERE case_id = ${caseId}
-    `;
-
     // Check for vehicles
     const vehicleCount = assetRecords.filter(a => a.asset_type === 'vehicle').length;
     const hasVehicle = vehicleCount > 0;
@@ -343,15 +336,10 @@ export async function POST(
       40
     );
 
-    // Update case with calculated totals
+    // Update case timestamp to reflect recalculation
     await sql`
       UPDATE bankruptcy_cases
-      SET
-        monthly_income = ${currentMonthlyIncome},
-        monthly_expenses = ${monthlyExpenses},
-        total_debt = ${totalDebt},
-        total_assets = ${Number(totalAssets[0].total)},
-        updated_at = NOW()
+      SET updated_at = NOW()
       WHERE id = ${caseId}
     `;
 
