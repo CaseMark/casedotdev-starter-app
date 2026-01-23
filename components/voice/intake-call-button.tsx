@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Phone, PhoneOff, Mic, MicOff, Loader2, X, Info } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Loader2, X, Info, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import { useVapi } from "@/app/hooks/useVapi";
 
 interface IntakeCallButtonProps {
@@ -13,10 +14,12 @@ interface IntakeCallButtonProps {
 export function IntakeCallButton({ className }: IntakeCallButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [connectionString, setConnectionString] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState("");
 
   const {
     startCall,
     endCall,
+    sendMessage,
     isSessionActive,
     isLoading,
     isSpeaking,
@@ -61,6 +64,20 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
     setIsOpen(false);
   };
 
+  const handleSendText = () => {
+    if (textInput.trim() && isSessionActive) {
+      sendMessage(textInput.trim());
+      setTextInput("");
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendText();
+    }
+  };
+
   // Get only final transcripts for display
   const finalTranscripts = transcripts.filter((t) => t.isFinal);
 
@@ -86,7 +103,9 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
       {/* Call Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className={`bg-background rounded-xl shadow-2xl w-full mx-4 overflow-hidden transition-all duration-500 ${
+            isSessionActive ? "max-w-5xl" : "max-w-lg"
+          }`}>
             {/* Header */}
             <div className="bg-primary p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -155,7 +174,7 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
             ) : (
               <>
                 {/* Transcript during call */}
-                <div className="h-64 overflow-y-auto p-4 space-y-3">
+                <div className="h-96 overflow-y-auto p-4 space-y-3">
                   {finalTranscripts.length === 0 && !error && (
                     <div className="text-center text-muted-foreground py-8">
                       {isLoading ? (
@@ -193,6 +212,29 @@ export function IntakeCallButton({ className }: IntakeCallButtonProps) {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Text input for manual typing */}
+                <div className="px-4 pb-3 border-t bg-muted/10">
+                  <div className="flex gap-2 pt-3">
+                    <Input
+                      type="text"
+                      placeholder="Type here..."
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      disabled={!isSessionActive}
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={handleSendText}
+                      disabled={!textInput.trim() || !isSessionActive}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* End Call button during active call */}
